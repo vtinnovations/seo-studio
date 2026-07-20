@@ -1,0 +1,191 @@
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+        public: false
+
+    _instanceof:
+        VTinnovations\SeoStudio\Core\Ai\AiClientInterface:
+            tags: ['seo_studio.ai_client']
+        VTinnovations\SeoStudio\Core\Config\FeatureInterface:
+            tags: ['seo_studio.feature']
+        VTinnovations\SeoStudio\Feature\InlinePanel\AdapterInterface:
+            tags: ['seo_studio.panel_adapter']
+
+    VTinnovations\SeoStudio\:
+        resource: '../src/'
+        exclude:
+            - '../src/VtinnovationsSeoStudioBundle.php'
+            - '../src/ContaoManager/'
+            - '../src/DependencyInjection/'
+            - '../src/Controller/'                       # BE_MOD callbacks + routed controllers, wired below
+            - '../src/Core/Ai/AiClientInterface.php'     # interface
+            - '../src/Core/Ai/PromptBundle.php'          # value object
+            - '../src/Core/Ai/AiResponse.php'            # value object
+            - '../src/Core/Ai/AiException.php'           # exception
+            - '../src/Core/Ai/AiExceptionKind.php'       # enum
+            - '../src/Core/Ai/TestResult.php'            # value object
+            - '../src/Core/Config/FeatureInterface.php'  # interface
+            - '../src/Core/Config/LicenseTier.php'       # enum
+            - '../src/Core/Security/BudgetExceededException.php'
+            - '../src/Core/Content/ExtractedContent.php' # value object
+            - '../src/Core/Content/HeadingNode.php'      # value object
+            - '../src/Feature/Meta/MetaProposal.php'     # value object
+            - '../src/Feature/Audit/AiCrawler.php'       # static catalogue
+            - '../src/Feature/Audit/RobotsParser.php'    # static factory
+            - '../src/Feature/InlinePanel/PanelResult.php'      # value object
+            - '../src/Feature/InlinePanel/AdapterInterface.php' # interface
+            - '../src/Feature/PageScore/SeoCheck.php'           # value object
+            - '../src/Feature/PageScore/SeoReport.php'          # value object
+            - '../src/Core/Security/LicensePaths.php'           # scalar arg, defined below
+
+    # ── Config + secrets ────────────────────────────────────────────────
+    VTinnovations\SeoStudio\Core\Config\ConfigProvider:
+        public: true   # fetched by BE_MOD callbacks via the container
+
+    VTinnovations\SeoStudio\Core\Security\SecretStore:
+        arguments:
+            $projectDir: '%kernel.project_dir%'
+        public: true   # fetched by BE_MOD callbacks via the container
+
+    # ── Licensing (paid product + 3-day demo) ───────────────────────────
+    VTinnovations\SeoStudio\Core\Security\LicensePaths:
+        arguments:
+            $projectDir: '%kernel.project_dir%'
+
+    VTinnovations\SeoStudio\Core\Security\LicenseVerifier:
+        arguments:
+            $client: '@http_client'
+
+    VTinnovations\SeoStudio\Core\Security\LicenseManager:
+        public: true   # fetched by BE_MOD callbacks via the container
+
+    VTinnovations\SeoStudio\Core\Security\LicenseGuard:
+        public: true   # fetched by BE_MOD callbacks + the shell/banner
+
+    VTinnovations\SeoStudio\Core\Config\FeatureRegistry:
+        arguments:
+            $features: !tagged_iterator seo_studio.feature
+        public: true
+
+    VTinnovations\SeoStudio\Core\Config\FeatureState:
+        public: true
+
+    VTinnovations\SeoStudio\Core\Content\RootScope:
+        public: true   # fetched by the dashboard + analysis BE_MOD callbacks
+
+    VTinnovations\SeoStudio\Core\Security\TokenBudget:
+        public: true
+
+    # ── AI provider clients ─────────────────────────────────────────────
+    VTinnovations\SeoStudio\Core\Ai\Provider\OpenAiClient:
+        arguments:
+            $httpClient: '@http_client'
+
+    VTinnovations\SeoStudio\Core\Ai\Provider\AnthropicClient:
+        arguments:
+            $httpClient: '@http_client'
+
+    VTinnovations\SeoStudio\Core\Ai\Provider\CompatibleClient:
+        arguments:
+            $httpClient: '@http_client'
+
+    VTinnovations\SeoStudio\Core\Ai\AiClientFactory:
+        arguments:
+            $clients: !tagged_iterator seo_studio.ai_client
+
+    VTinnovations\SeoStudio\Core\Ai\ConnectionTester:
+        public: true   # fetched by the settings BE_MOD callback
+
+    # ── Feature services used by BE_MOD callbacks (container-fetched) ───
+    VTinnovations\SeoStudio\Feature\Audit\RobotsAuditor:
+        arguments:
+            $httpClient: '@http_client'
+        public: true
+
+    VTinnovations\SeoStudio\Feature\LlmsTxt\SummaryGenerator:
+        public: true
+
+    VTinnovations\SeoStudio\Feature\Meta\MetaGenerator:
+        public: true   # fetched by the dashboard BE_MOD callback (bulk fill)
+
+    VTinnovations\SeoStudio\Feature\Glossary\GlossaryGenerator:
+        arguments:
+            $slug: '@contao.slug'
+        public: true   # fetched by the dashboard BE_MOD callback
+
+    VTinnovations\SeoStudio\Feature\Glossary\GlossaryImporter:
+        public: true   # fetched by the dashboard BE_MOD callback
+
+    VTinnovations\SeoStudio\Feature\Faq\FaqGenerator:
+        public: true   # fetched by the Inhalte&Meta BE_MOD callback
+
+    VTinnovations\SeoStudio\Feature\Audit\HeadingAuditor:
+        public: true   # fetched by the audit BE_MOD callback
+
+    VTinnovations\SeoStudio\Feature\Audit\AnswerFirstChecker:
+        public: true   # fetched by the audit BE_MOD callback
+
+    VTinnovations\SeoStudio\Feature\Audit\DuplicateChecker:
+        public: true   # fetched by the audit BE_MOD callback
+
+    VTinnovations\SeoStudio\Feature\GeoScore\GeoScoreCalculator:
+        public: true   # fetched by the dashboard BE_MOD callback
+
+    VTinnovations\SeoStudio\Feature\Freshness\StalePageFinder:
+        public: true   # fetched by the dashboard BE_MOD callback
+
+    VTinnovations\SeoStudio\Feature\Images\ImageAuditor:
+        arguments:
+            $projectDir: '%kernel.project_dir%'
+        public: true   # fetched by the dashboard BE_MOD callback
+
+    VTinnovations\SeoStudio\Feature\Images\ImageSizeWizard:
+        public: true   # fetched by the dashboard BE_MOD callback
+
+    # ── Inline panels ───────────────────────────────────────────────────
+    VTinnovations\SeoStudio\Feature\InlinePanel\Adapter\AltTextAdapter:
+        arguments:
+            $projectDir: '%kernel.project_dir%'
+
+    VTinnovations\SeoStudio\Feature\InlinePanel\AdapterRegistry:
+        arguments:
+            $adapters: !tagged_iterator seo_studio.panel_adapter
+
+    # ── Routed controllers ──────────────────────────────────────────────
+    VTinnovations\SeoStudio\Controller\MetaController:
+        public: true
+        tags: ['controller.service_arguments']
+
+    VTinnovations\SeoStudio\Controller\PanelSuggestController:
+        public: true
+        tags: ['controller.service_arguments']
+
+    VTinnovations\SeoStudio\Controller\FaqGenerateController:
+        public: true
+        tags: ['controller.service_arguments']
+
+    VTinnovations\SeoStudio\Controller\GlossaryMetaController:
+        public: true
+        tags: ['controller.service_arguments']
+
+    # ── Global text/headline optimizer ─────────────────────────────────
+    VTinnovations\SeoStudio\Controller\OptimizeController:
+        public: true
+        tags: ['controller.service_arguments']
+
+    VTinnovations\SeoStudio\Controller\PageFixController:
+        public: true
+        tags: ['controller.service_arguments']
+
+    VTinnovations\SeoStudio\Controller\FrontendModule\FaqModuleController:
+        public: true
+        tags: ['controller.service_arguments']
+
+    VTinnovations\SeoStudio\Controller\FrontendModule\GlossaryModuleController:
+        public: true
+        tags: ['controller.service_arguments']
+
+    VTinnovations\SeoStudio\Controller\LlmsTxtController:
+        public: true
+        tags: ['controller.service_arguments']

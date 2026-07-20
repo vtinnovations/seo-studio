@@ -1,0 +1,621 @@
+/* SEO Studio backend styles — light defaults + Contao dark mode */
+:root {
+    --seo-studio-bg: #fafafa;
+    --seo-studio-card: #ffffff;
+    --seo-studio-border: #dddddd;
+    --seo-studio-muted: #888888;
+    --seo-studio-code-bg: #f5f5f5;
+}
+
+html[data-color-scheme="dark"] {
+    --seo-studio-bg: #2b2b2d;
+    --seo-studio-card: #1f1f21;
+    --seo-studio-border: #44444a;
+    --seo-studio-muted: #9b9ba1;
+    --seo-studio-code-bg: #2f2f33;
+}
+
+.seo-studio-panel {
+    border: 1px solid var(--seo-studio-border);
+    border-radius: 4px;
+    padding: 12px;
+    margin-top: 12px;
+    background: var(--seo-studio-bg);
+}
+
+.seo-studio-panel h3 {
+    margin-top: 0;
+}
+
+.seo-studio-result {
+    margin-top: 8px;
+    padding: 8px 10px;
+    background: var(--seo-studio-card);
+    border: 1px solid var(--seo-studio-border);
+    border-radius: 3px;
+}
+
+.seo-studio-proposal em {
+    color: var(--seo-studio-muted);
+    font-style: normal;
+    font-size: 0.85em;
+}
+
+.seo-studio-status {
+    margin-left: 8px;
+}
+
+.seo-studio-muted {
+    color: var(--seo-studio-muted);
+}
+
+.seo-studio-pre {
+    background: var(--seo-studio-code-bg);
+    border: 1px solid var(--seo-studio-border);
+    padding: 10px;
+    border-radius: 3px;
+    overflow-x: auto;
+}
+
+.seo-studio-note {
+    background: var(--seo-studio-code-bg);
+    border: 1px solid var(--seo-studio-border);
+    padding: 8px;
+    border-radius: 3px;
+}
+
+.seo-studio-badge {
+    display: inline-block;
+    min-width: 28px;
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    text-align: center;
+    color: #fff;
+}
+
+.seo-studio-badge--good { background: #4caf50; }
+.seo-studio-badge--mid { background: #ff9800; }
+.seo-studio-badge--bad { background: #f44336; }
+
+/* ── Dashboard ─────────────────────────────────────────────── */
+.seo-studio-hint {
+    padding: 12px 16px;
+    border-radius: 6px;
+    margin-bottom: 16px;
+    border: 1px solid var(--seo-studio-border);
+    background: var(--seo-studio-card);
+}
+
+.seo-studio-hint--warn {
+    border-left: 4px solid #ff9800;
+}
+
+.seo-studio-dash {
+    display: grid;
+    grid-template-columns: minmax(240px, 320px) 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+@media (max-width: 900px) {
+    .seo-studio-dash {
+        grid-template-columns: 1fr;
+    }
+}
+
+.seo-studio-card {
+    background: var(--seo-studio-card);
+    border: 1px solid var(--seo-studio-border);
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.seo-studio-card h3 {
+    margin: 0 0 14px;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.seo-studio-card--health {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.seo-studio-card-sub {
+    font-size: 12px;
+    color: var(--seo-studio-muted);
+    margin: 10px 0 0;
+    max-width: 240px;
+}
+
+/* Donut */
+.seo-studio-donut {
+    max-width: 150px;
+    height: auto;
+}
+
+.seo-studio-donut-value {
+    font-size: 30px;
+    font-weight: 700;
+    fill: currentColor;
+}
+
+.seo-studio-donut-unit {
+    font-size: 12px;
+    fill: var(--seo-studio-muted);
+}
+
+.seo-studio-legend {
+    display: flex;
+    gap: 14px;
+    margin-top: 14px;
+    font-size: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.seo-studio-legend .dot {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    margin-right: 5px;
+}
+
+.dot--good { background: #4caf50; }
+.dot--mid { background: #ff9800; }
+.dot--bad { background: #f44336; }
+
+/* Coverage bars */
+.seo-studio-bar-row {
+    margin-bottom: 14px;
+}
+
+.seo-studio-bar-row:last-child {
+    margin-bottom: 0;
+}
+
+.seo-studio-bar-head {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    margin-bottom: 5px;
+}
+
+.seo-studio-bar {
+    height: 8px;
+    border-radius: 4px;
+    background: var(--seo-studio-code-bg);
+    overflow: hidden;
+}
+
+.seo-studio-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width .3s ease;
+}
+
+.seo-studio-bar-fill--good { background: #4caf50; }
+.seo-studio-bar-fill--mid { background: #ff9800; }
+.seo-studio-bar-fill--bad { background: #f44336; }
+
+/* To-dos */
+.seo-studio-card--todos {
+    margin-bottom: 16px;
+}
+
+.seo-studio-todos {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.seo-studio-todo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    border-left: 4px solid var(--seo-studio-border);
+    background: var(--seo-studio-bg);
+    margin-bottom: 8px;
+}
+
+.seo-studio-todo:last-child {
+    margin-bottom: 0;
+}
+
+.seo-studio-todo--bad { border-left-color: #f44336; }
+.seo-studio-todo--mid { border-left-color: #ff9800; }
+.seo-studio-todo--info { border-left-color: #2196f3; }
+
+.seo-studio-todo-text {
+    font-size: 13px;
+}
+
+.seo-studio-todo-cta {
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    text-decoration: none;
+}
+
+/* Explainer */
+.seo-studio-explainer {
+    border: 1px solid var(--seo-studio-border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    background: var(--seo-studio-card);
+}
+
+.seo-studio-explainer summary {
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.seo-studio-explainer[open] summary {
+    margin-bottom: 8px;
+}
+
+/* Modern segmented tab control */
+.seo-studio-tabnav {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 4px;
+    background: var(--seo-studio-code-bg);
+    border: 1px solid var(--seo-studio-border);
+    border-radius: 10px;
+    margin-bottom: 16px;
+    max-width: 100%;
+}
+
+.seo-studio-tab {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    border-radius: 7px;
+    padding: 7px 15px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--seo-studio-muted);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background .12s, color .12s;
+}
+
+.seo-studio-tab:hover {
+    color: inherit;
+}
+
+.seo-studio-tab.is-active {
+    background: var(--seo-studio-card);
+    color: inherit;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .18);
+}
+
+.seo-studio-tabpanel > form:first-child > fieldset:first-child,
+.seo-studio-tabpanel > fieldset:first-child {
+    margin-top: 0;
+}
+
+/* ── Per-page SEO score (tl_page) ─────────────────────────────────── */
+/* Badge in the page tree */
+.seo-studio-pagebadge {
+    display: inline-block;
+    min-width: 26px;
+    padding: 1px 6px;
+    margin-right: 6px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 16px;
+    text-align: center;
+    color: #fff;
+    vertical-align: middle;
+}
+.seo-studio-pagebadge--good { background: #4caf50; }
+.seo-studio-pagebadge--mid  { background: #ff9800; }
+.seo-studio-pagebadge--bad  { background: #f44336; }
+
+/* Checklist panel in the edit form */
+.seo-studio-scorepanel {
+    border: 1px solid var(--seo-studio-border);
+    border-radius: 8px;
+    padding: 16px;
+    background: var(--seo-studio-card);
+}
+.seo-studio-score-head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 4px;
+}
+.seo-studio-scoreball {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+}
+.seo-studio-scoreball--good { background: #4caf50; }
+.seo-studio-scoreball--mid  { background: #ff9800; }
+.seo-studio-scoreball--bad  { background: #f44336; }
+
+.seo-studio-checkgroup {
+    margin: 14px 0 6px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--seo-studio-muted);
+}
+.seo-studio-checklist {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.seo-studio-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 4px 0;
+    font-size: 13px;
+    border-bottom: 1px solid var(--seo-studio-border);
+}
+.seo-studio-check:last-child { border-bottom: none; }
+.seo-studio-check-icon {
+    flex: 0 0 18px;
+    text-align: center;
+    font-weight: 700;
+}
+.seo-studio-check--good .seo-studio-check-icon { color: #4caf50; }
+.seo-studio-check--warn .seo-studio-check-icon { color: #ff9800; }
+.seo-studio-check--bad  .seo-studio-check-icon { color: #f44336; }
+
+/* Per-page 1-click fixes */
+.seo-studio-pf-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin: 12px 0 4px;
+}
+.seo-studio-pf-status {
+    font-size: 12px;
+}
+.seo-studio-pf-link {
+    appearance: none;
+    background: transparent;
+    border: none;
+    padding: 0 2px;
+    margin-left: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #2b8a3e;
+    cursor: pointer;
+    text-decoration: underline;
+}
+.seo-studio-pf-link:hover { color: #40c057; }
+.seo-studio-pf-link:disabled { opacity: .5; cursor: default; }
+html[data-color-scheme="dark"] .seo-studio-pf-link { color: #69db7c; }
+
+/* ── Social-media preview card ────────────────────────────────────── */
+.seo-studio-social { max-width: 560px; }
+.seo-studio-socialcard {
+    border: 1px solid var(--seo-studio-border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--seo-studio-card);
+    max-width: 524px;
+}
+.seo-studio-socialcard-img {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 273px;
+    background-size: cover;
+    background-position: center;
+    background-color: var(--seo-studio-code-bg);
+    color: var(--seo-studio-muted);
+    font-size: 13px;
+}
+.seo-studio-socialcard-img--empty {
+    border-bottom: 1px solid var(--seo-studio-border);
+}
+.seo-studio-socialcard-body {
+    display: block;
+    padding: 10px 14px;
+    border-top: 1px solid var(--seo-studio-border);
+}
+.seo-studio-socialcard-domain {
+    display: block;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .02em;
+    color: var(--seo-studio-muted);
+    margin-bottom: 3px;
+}
+.seo-studio-socialcard-title {
+    display: block;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.3;
+    margin-bottom: 3px;
+}
+.seo-studio-socialcard-desc {
+    display: block;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--seo-studio-muted);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* ── Unified module shell (Content&Meta / Analysis / Settings) ────── */
+.seo-studio-shell {
+    padding: 4px 4px 28px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.seo-studio-hero {
+    border: 1px solid var(--seo-studio-border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    background: var(--seo-studio-card);
+    line-height: 1.55;
+}
+.seo-studio-hero > :first-child { margin-top: 0; }
+.seo-studio-hero > :last-child { margin-bottom: 0; }
+.seo-studio-hero code {
+    background: var(--seo-studio-code-bg);
+    border: 1px solid var(--seo-studio-border);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-size: 12px;
+}
+
+/* Standalone fieldsets (outside tabs) become cards */
+.seo-studio-shell > fieldset.tl_box,
+.seo-studio-shell > fieldset.tl_tbox,
+.seo-studio-shell > form > .tl_formbody_edit > fieldset.tl_box,
+.seo-studio-shell > form > .tl_formbody_edit > fieldset.tl_tbox {
+    border: 1px solid var(--seo-studio-border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin: 0 0 16px;
+    background: var(--seo-studio-card);
+}
+
+/* Tabs: segmented nav sits above a standalone carded panel */
+.seo-studio-tabpanel {
+    border: 1px solid var(--seo-studio-border);
+    border-radius: 10px;
+    padding: 20px 22px;
+    background: var(--seo-studio-card);
+}
+.seo-studio-tabpanel > fieldset.tl_box,
+.seo-studio-tabpanel > fieldset.tl_tbox,
+.seo-studio-tabpanel fieldset.tl_box,
+.seo-studio-tabpanel fieldset.tl_tbox {
+    border: 0;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+}
+.seo-studio-tabpanel legend,
+.seo-studio-shell fieldset > legend {
+    font-size: 15px;
+    font-weight: 600;
+    color: inherit;
+    padding: 0;
+    margin: 0 0 12px;
+    border: 0;
+}
+.seo-studio-tabpanel > form:first-child > fieldset:first-child > legend {
+    margin-top: 0;
+}
+
+/* Breathing room for form widgets inside the shell */
+.seo-studio-shell .widget { margin-bottom: 14px; }
+.seo-studio-shell .tl_submit_container { margin-top: 6px; }
+
+/* Form controls must never overflow their widget box */
+.seo-studio-shell select.tl_select,
+.seo-studio-shell input.tl_text,
+.seo-studio-shell textarea.tl_textarea,
+.seo-studio-tabpanel select.tl_select,
+.seo-studio-tabpanel input.tl_text,
+.seo-studio-tabpanel textarea.tl_textarea {
+    max-width: 100%;
+    box-sizing: border-box;
+}
+.seo-studio-shell .tl_formbody_submit {
+    margin-top: 18px;
+    padding-top: 0;
+    border: 0;
+}
+
+/* Inline select+button row (bulk actions) */
+.seo-studio-inline-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 12px;
+}
+.seo-studio-inline-row select.tl_select {
+    flex: 0 1 320px;
+    max-width: 320px;
+    margin: 0;
+}
+.seo-studio-inline-row .tl_submit { margin: 0; }
+
+/* Gap between a checkbox and its label (Funktionen toggles etc.). Scoped to the module so it
+   does not touch other Contao backend checkboxes. */
+.seo-studio-shell .tl_checkbox { margin: 0 5px 0 0; }
+
+/* ── Licence banner (demo countdown / expiry) ─────────────────────── */
+.seo-studio-license {
+    padding: 12px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--seo-studio-border);
+    border-left-width: 4px;
+    background: var(--seo-studio-card);
+    font-size: 13px;
+    line-height: 1.5;
+}
+.seo-studio-license a { font-weight: 600; }
+.seo-studio-license--demo { border-left-color: #2196f3; }
+.seo-studio-license--expired { border-left-color: #f44336; }
+
+/* Site-root filter (dashboard + analysis) */
+.seo-studio-rootfilter {
+    margin: 0 0 16px;
+    font-size: 13px;
+}
+.seo-studio-rootfilter label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+}
+.seo-studio-rootfilter select.tl_select {
+    width: auto;
+    max-width: 340px;
+    margin: 0;
+}
+
+/* SEO / GEO / AEO layer breakdown in the health card */
+.seo-studio-triscore {
+    width: 100%;
+    margin-top: 18px;
+    text-align: left;
+}
+.seo-studio-triscore-row { margin-bottom: 12px; }
+.seo-studio-triscore-row:last-child { margin-bottom: 0; }
+.seo-studio-triscore-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 12px;
+    margin-bottom: 5px;
+}
+.seo-studio-triscore-head strong { font-size: 13px; }

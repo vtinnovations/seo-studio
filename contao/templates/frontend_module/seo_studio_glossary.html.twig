@@ -1,0 +1,31 @@
+{% extends "@Contao/frontend_module/_base.html.twig" %}
+
+{% block content %}
+    {% if view == 'detail' %}
+        <div class="seo-studio-glossary-detail">
+            <h1>{{ entry.term }}</h1>
+            <div class="seo-studio-glossary-definition">{{ entry.definition|raw }}</div>
+        </div>
+    {% else %}
+        <div class="seo-studio-glossary-list">
+            <nav class="seo-studio-glossary-nav" aria-label="Glossar A-Z">
+                {% for letter, items in groups %}
+                    <a href="#glossary-{{ letter }}">{{ letter }}</a>
+                {% endfor %}
+            </nav>
+            {% for letter, items in groups %}
+                <section id="glossary-{{ letter }}" class="seo-studio-glossary-group">
+                    <h2>{{ letter }}</h2>
+                    <dl>
+                        {% for item in items %}
+                            <dt><a href="{{ base_url }}/{{ item.alias }}">{{ item.term }}</a></dt>
+                            {% set plain = item.definition|striptags %}
+                            <dd>{{ plain|length > 160 ? plain|slice(0, 160) ~ '…' : plain }}</dd>
+                        {% endfor %}
+                    </dl>
+                </section>
+            {% endfor %}
+        </div>
+    {% endif %}
+    <script type="application/ld+json">{{ json_ld|raw }}</script>
+{% endblock %}

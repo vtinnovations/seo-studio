@@ -1,0 +1,13 @@
+{% extends "@Contao/frontend_module/_base.html.twig" %}
+
+{% block content %}
+    <div class="seo-studio-faq-list">
+        {% for faq in faqs %}
+            <details class="seo-studio-faq-item"{% if loop.first %} open{% endif %}>
+                <summary>{{ faq.question }}</summary>
+                <div class="seo-studio-faq-answer">{{ faq.answer|raw }}</div>
+            </details>
+        {% endfor %}
+    </div>
+    <script type="application/ld+json">{{ json_ld|raw }}</script>
+{% endblock %}

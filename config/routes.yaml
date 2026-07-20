@@ -1,0 +1,54 @@
+seo_studio.meta_generate:
+    path: /contao/seostudio/meta/generate
+    defaults:
+        _controller: VTinnovations\SeoStudio\Controller\MetaController::generateAction
+        _scope: backend
+        _token_check: true
+    methods: [POST]
+
+seo_studio.panel_suggest:
+    path: /contao/seostudio/panel/suggest
+    defaults:
+        _controller: VTinnovations\SeoStudio\Controller\PanelSuggestController::suggestAction
+        _scope: backend
+        _token_check: true
+    methods: [POST]
+
+seo_studio.page_suggest_keyword:
+    path: /contao/seostudio/page/suggest-keyword
+    defaults:
+        _controller: VTinnovations\SeoStudio\Controller\PageFixController::suggestKeywordAction
+        _scope: backend
+        _token_check: true
+    methods: [POST]
+
+seo_studio.optimize:
+    path: /contao/seostudio/optimize
+    defaults:
+        _controller: VTinnovations\SeoStudio\Controller\OptimizeController::optimizeAction
+        _scope: backend
+        _token_check: true
+    methods: [POST]
+
+seo_studio.glossary_meta:
+    path: /contao/seostudio/glossary/meta
+    defaults:
+        _controller: VTinnovations\SeoStudio\Controller\GlossaryMetaController::metaAction
+        _scope: backend
+        _token_check: true
+    methods: [POST]
+
+seo_studio.faq_generate:
+    path: /contao/seostudio/faq/generate
+    defaults:
+        _controller: VTinnovations\SeoStudio\Controller\FaqGenerateController::generateAction
+        _scope: backend
+        _token_check: true
+    methods: [POST]
+
+seo_studio.llms_txt:
+    path: /llms.txt
+    defaults:
+        _controller: VTinnovations\SeoStudio\Controller\LlmsTxtController
+        _scope: frontend
+    methods: [GET]

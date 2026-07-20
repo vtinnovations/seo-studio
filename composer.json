@@ -1,0 +1,26 @@
+{
+    "name": "vtinnovations/seo-studio",
+    "type": "contao-bundle",
+    "description": "AI SEO Studio — AI-powered SEO/GEO/AEO suite for Contao 5",
+    "license": "LGPL-3.0-or-later",
+    "authors": [
+        {
+            "name": "VT Innovations Team"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "contao/core-bundle": "^5.3",
+        "symfony/http-client": "^6.4 || ^7.0",
+        "symfony/http-foundation": "^6.4 || ^7.0",
+        "defuse/php-encryption": "^2.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "VTinnovations\\SeoStudio\\": "src/"
+        }
+    },
+    "extra": {
+        "contao-manager-plugin": "VTinnovations\\SeoStudio\\ContaoManager\\Plugin"
+    }
+}

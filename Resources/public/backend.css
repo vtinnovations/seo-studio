@@ -1,3 +1,11 @@
+/*
+ * AI SEO Studio
+ *
+ * Package: vtinnovations/seo-studio
+ * Copyright: VT Innovations Team
+ * Licence: LGPL-3.0-or-later
+ */
+
 /* SEO Studio backend styles — light defaults + Contao dark mode */
 :root {
     --seo-studio-bg: #fafafa;
@@ -5,6 +13,10 @@
     --seo-studio-border: #dddddd;
     --seo-studio-muted: #888888;
     --seo-studio-code-bg: #f5f5f5;
+    --seo-studio-ok-border: #43a047;
+    --seo-studio-ok-text: #2e7d32;
+    --seo-studio-error-border: #e53935;
+    --seo-studio-error-text: #c62828;
 }
 
 html[data-color-scheme="dark"] {
@@ -13,6 +25,10 @@ html[data-color-scheme="dark"] {
     --seo-studio-border: #44444a;
     --seo-studio-muted: #9b9ba1;
     --seo-studio-code-bg: #2f2f33;
+    --seo-studio-ok-border: #3f8a45;
+    --seo-studio-ok-text: #5fd767;
+    --seo-studio-error-border: #b04440;
+    --seo-studio-error-text: #ff8a80;
 }
 
 .seo-studio-panel {
@@ -78,6 +94,90 @@ html[data-color-scheme="dark"] {
 .seo-studio-badge--good { background: #4caf50; }
 .seo-studio-badge--mid { background: #ff9800; }
 .seo-studio-badge--bad { background: #f44336; }
+
+/* ── Licence panel (Contao → Settings) ─────────────────────── */
+.seo-studio-licence {
+    max-width: 640px;
+}
+
+/*
+ * One frame around the whole section — status, key field and actions alike —
+ * matching the licence sections the sibling V-T.ONE packages render on this
+ * same settings screen.
+ */
+.seo-studio-licence__box {
+    padding: 12px 15px;
+    border: 1px solid var(--seo-studio-border);
+    border-radius: 4px;
+    background: var(--seo-studio-card);
+}
+
+/*
+ * The status lives inside that frame, so it carries no frame of its own.
+ * Contao's tl_confirm/tl_error/tl_info class stays on the element for its
+ * semantics and is overridden here by name — otherwise Contao's message
+ * padding, border, background image and colour would show through.
+ */
+.seo-studio-licence .seo-studio-licence__state,
+.seo-studio-licence .seo-studio-licence__state.tl_confirm,
+.seo-studio-licence .seo-studio-licence__state.tl_error,
+.seo-studio-licence .seo-studio-licence__state.tl_info {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    color: inherit;
+}
+
+.seo-studio-licence__headline {
+    margin: 0 0 4px;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.seo-studio-licence__state--ok .seo-studio-licence__headline {
+    color: var(--seo-studio-ok-text);
+}
+
+.seo-studio-licence__state--error .seo-studio-licence__headline {
+    color: var(--seo-studio-error-text);
+}
+
+.seo-studio-licence__facts {
+    margin: 0;
+    color: var(--seo-studio-muted);
+    font-size: 12px;
+    line-height: 1.7;
+    word-break: break-word;
+}
+
+.seo-studio-licence__field {
+    margin: 0;
+}
+
+.seo-studio-licence__label {
+    display: block;
+    margin: 12px 0 4px;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.seo-studio-licence .seo-studio-licence__input {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.seo-studio-licence__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 8px 0 0;
+}
+
+.seo-studio-licence__hint {
+    margin: 12px 0 0;
+}
 
 /* ── Dashboard ─────────────────────────────────────────────── */
 .seo-studio-hint {
@@ -202,6 +302,8 @@ html[data-color-scheme="dark"] {
 .seo-studio-bar-fill--good { background: #4caf50; }
 .seo-studio-bar-fill--mid { background: #ff9800; }
 .seo-studio-bar-fill--bad { background: #f44336; }
+/* Neutral: a bar that reports a fact instead of passing judgement. */
+.seo-studio-bar-fill--info { background: #78909c; }
 
 /* To-dos */
 .seo-studio-card--todos {
@@ -468,7 +570,7 @@ html[data-color-scheme="dark"] .seo-studio-pf-link { color: #69db7c; }
 
 /* ── Unified module shell (Content&Meta / Analysis / Settings) ────── */
 .seo-studio-shell {
-    padding: 4px 4px 28px 0;
+    padding: 4px 0 28px 0;
     display: flex;
     flex-direction: column;
     gap: 18px;
@@ -571,23 +673,10 @@ html[data-color-scheme="dark"] .seo-studio-pf-link { color: #69db7c; }
    does not touch other Contao backend checkboxes. */
 .seo-studio-shell .tl_checkbox { margin: 0 5px 0 0; }
 
-/* ── Licence banner (demo countdown / expiry) ─────────────────────── */
-.seo-studio-license {
-    padding: 12px 16px;
-    border-radius: 8px;
-    border: 1px solid var(--seo-studio-border);
-    border-left-width: 4px;
-    background: var(--seo-studio-card);
-    font-size: 13px;
-    line-height: 1.5;
-}
-.seo-studio-license a { font-weight: 600; }
-.seo-studio-license--demo { border-left-color: #2196f3; }
-.seo-studio-license--expired { border-left-color: #f44336; }
-
 /* Site-root filter (dashboard + analysis) */
 .seo-studio-rootfilter {
     margin: 0 0 16px;
+    padding: 0 20px;
     font-size: 13px;
 }
 .seo-studio-rootfilter label {
@@ -610,6 +699,8 @@ html[data-color-scheme="dark"] .seo-studio-pf-link { color: #69db7c; }
 }
 .seo-studio-triscore-row { margin-bottom: 12px; }
 .seo-studio-triscore-row:last-child { margin-bottom: 0; }
+.seo-studio-layerhint { margin: 6px 0 0; font-size: 11px; line-height: 1.45; color: var(--seo-studio-muted, #8a8a8a); }
+.seo-studio-layerhint a { white-space: nowrap; }
 .seo-studio-triscore-head {
     display: flex;
     justify-content: space-between;
@@ -619,3 +710,90 @@ html[data-color-scheme="dark"] .seo-studio-pf-link { color: #69db7c; }
     margin-bottom: 5px;
 }
 .seo-studio-triscore-head strong { font-size: 13px; }
+
+/* Criteria checklist inside the inline optimizer panel */
+.seo-studio-optchecks {
+    list-style: none;
+    margin: 10px 0 0;
+    padding: 0;
+}
+.seo-studio-optchecks .seo-studio-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 3px 0;
+    font-size: 13px;
+    border-bottom: 1px solid var(--seo-studio-border);
+}
+.seo-studio-optchecks .seo-studio-check:last-child { border-bottom: none; }
+
+/* Score of content that is not published — shown, but visibly not counting */
+.seo-studio-pagebadge--muted {
+    opacity: .45;
+    filter: grayscale(60%);
+}
+
+/* Inline field explanations in the settings tabs — plain language, right where
+   the field is, because a bare label like "sameAs" explains nothing. */
+.seo-studio-fieldhelp {
+    margin: 6px 0 0;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--seo-studio-muted, #8a8a8a);
+}
+.seo-studio-fieldhelp--intro {
+    margin: 0 0 14px;
+    padding: 10px 12px;
+    font-size: 12px;
+    border-left: 3px solid var(--seo-studio-accent, #f47c00);
+    background: rgba(128, 128, 128, .08);
+    border-radius: 0 3px 3px 0;
+}
+.seo-studio-fieldhelp code {
+    padding: 1px 4px;
+    border-radius: 2px;
+    background: rgba(128, 128, 128, .18);
+}
+
+/* Worked example under a task — "insert a list element" means nothing until
+   you have seen one filled in. */
+.seo-studio-example {
+    margin: 2px 0 10px;
+    font-size: 11px;
+}
+.seo-studio-example summary {
+    cursor: pointer;
+    color: var(--seo-studio-muted, #8a8a8a);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+.seo-studio-example[open] summary {
+    margin-bottom: 6px;
+}
+.seo-studio-example-body {
+    padding: 10px 12px;
+    border-left: 3px solid var(--seo-studio-border, #ddd);
+    background: rgba(128, 128, 128, .07);
+    border-radius: 0 3px 3px 0;
+}
+.seo-studio-example-body p { margin: 0 0 6px; }
+.seo-studio-example-body pre {
+    margin: 0 0 10px;
+    padding: 8px 10px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    background: var(--seo-studio-code-bg, #f5f5f5);
+    border: 1px solid var(--seo-studio-border, #ddd);
+    border-radius: 3px;
+    font-size: 11px;
+    line-height: 1.5;
+}
+.seo-studio-example-body pre:last-child { margin-bottom: 0; }
+.seo-studio-ex-label {
+    font-weight: 600;
+    margin-bottom: 3px !important;
+}
+.seo-studio-ex-hint {
+    margin-top: 8px !important;
+    color: var(--seo-studio-muted, #8a8a8a);
+}

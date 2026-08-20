@@ -1,3 +1,11 @@
+/*
+ * AI SEO Studio
+ *
+ * Package: vtinnovations/seo-studio
+ * Copyright: VT Innovations Team
+ * Licence: LGPL-3.0-or-later
+ */
+
 /* SEO Studio — global text/headline optimizer (score + rewrite + generate). */
 (function () {
     'use strict';
@@ -44,6 +52,7 @@
         var result = root.querySelector('.seo-studio-result');
         var reason = root.querySelector('.seo-studio-reason');
         var altList = root.querySelector('.seo-studio-alternatives');
+        var checkList = root.querySelector('.seo-studio-optchecks');
         var rewriteBox = root.querySelector('.seo-studio-rewrite-box');
         var rewritePreview = root.querySelector('.seo-studio-rewrite-preview');
         var btnApply = root.querySelector('.seo-studio-opt-apply');
@@ -55,6 +64,41 @@
         function setStatus(text, isError) {
             status.textContent = text || '';
             status.style.color = isError ? '#c33' : '';
+        }
+
+        // Renders every measured criterion, so it is obvious what still stands
+        // between the current text and 100/100.
+        function renderChecks(checks) {
+            if (!checkList) {
+                return;
+            }
+            checkList.innerHTML = '';
+
+            (checks || []).forEach(function (check) {
+                var li = document.createElement('li');
+                li.className = 'seo-studio-check seo-studio-check--'
+                    + (check.ok ? 'good' : (check.soft ? 'warn' : 'bad'));
+
+                var icon = document.createElement('span');
+                icon.className = 'seo-studio-check-icon';
+                icon.textContent = check.ok ? '✓' : (check.soft ? '⚠' : '✗');
+                li.appendChild(icon);
+
+                var label = document.createElement('span');
+                label.className = 'seo-studio-check-label';
+                label.textContent = check.label;
+
+                var detail = check.ok ? check.note : (check.fix || check.note);
+                if (detail) {
+                    var muted = document.createElement('span');
+                    muted.className = 'seo-studio-muted';
+                    muted.textContent = ' — ' + detail;
+                    label.appendChild(muted);
+                }
+
+                li.appendChild(label);
+                checkList.appendChild(li);
+            });
         }
 
         function request(mode, onOk) {
@@ -107,6 +151,7 @@
                 setStatus('', false);
                 verdict.innerHTML = '<span class="seo-studio-badge seo-studio-badge--' + data.color + '">' + data.score + '/100</span>';
                 reason.textContent = data.reason;
+                renderChecks(data.checks);
                 altList.innerHTML = '';
                 (data.alternatives || []).forEach(function (alt) {
                     var li = document.createElement('li');
@@ -140,6 +185,10 @@
                 setStatus('', false);
                 pendingRewrite = data.rewrite || '';
                 reason.textContent = data.reason || '';
+                if (data.score) {
+                    verdict.innerHTML = '<span class="seo-studio-badge seo-studio-badge--' + data.color + '">' + data.score + '/100</span>';
+                }
+                renderChecks(data.checks);
                 altList.innerHTML = '';
                 // Show the proposal as text (headlines) or rendered HTML (text).
                 if (isHeadline) {

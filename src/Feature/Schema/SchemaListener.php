@@ -2,11 +2,12 @@
 
 declare(strict_types=1);
 
-/**
- * @package   vtinnovations/seo-studio
- * @author    VT Innovations Team
- * @license   LGPL-3.0-or-later
- * @copyright VT Innovations 2026
+/*
+ * AI SEO Studio
+ *
+ * Package: vtinnovations/seo-studio
+ * Copyright: VT Innovations Team
+ * Licence: LGPL-3.0-or-later
  */
 
 namespace VTinnovations\SeoStudio\Feature\Schema;
@@ -20,6 +21,7 @@ use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpKernel\Event\ResponseEvent;
 use VTinnovations\SeoStudio\Core\Config\ConfigProvider;
+use VTinnovations\SeoStudio\Core\Config\EntitlementEvaluator;
 use VTinnovations\SeoStudio\Core\Config\FeatureState;
 
 /**
@@ -44,12 +46,19 @@ final class SchemaListener
         private readonly ContaoFramework $framework,
         private readonly RequestStack $requestStack,
         private readonly ScopeMatcher $scopeMatcher,
+        private readonly EntitlementEvaluator $entitlement,
     ) {
     }
 
     public function __invoke(ResponseEvent $event): void
     {
         if (!$event->isMainRequest() || !$this->scopeMatcher->isFrontendRequest($event->getRequest())) {
+            return;
+        }
+
+        // Unlicensed installations emit exactly what Contao emits on its own:
+        // no injection, no altered markup, no error.
+        if (!$this->entitlement->isLicensed()) {
             return;
         }
 

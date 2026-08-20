@@ -2,11 +2,12 @@
 
 declare(strict_types=1);
 
-/**
- * @package   vtinnovations/seo-studio
- * @author    VT Innovations Team
- * @license   LGPL-3.0-or-later
- * @copyright VT Innovations 2026
+/*
+ * AI SEO Studio
+ *
+ * Package: vtinnovations/seo-studio
+ * Copyright: VT Innovations Team
+ * Licence: LGPL-3.0-or-later
  */
 
 namespace VTinnovations\SeoStudio\Feature\LlmsTxt;
@@ -15,6 +16,7 @@ use Contao\CoreBundle\Framework\ContaoFramework;
 use Contao\PageModel;
 use Doctrine\DBAL\Connection;
 use VTinnovations\SeoStudio\Core\Config\ConfigProvider;
+use VTinnovations\SeoStudio\Core\Config\Translations;
 
 /**
  * Builds llms.txt (llmstxt.org convention): H1 site name, optional blockquote
@@ -117,7 +119,7 @@ final class LlmsTxtBuilder
             if (\count($roots) > 1) {
                 $lines[] = '## ' . (string) $root['title'];
             } else {
-                $lines[] = '## Seiten';
+                $lines[] = '## ' . Translations::text('llms.pagesHeading');
             }
 
             foreach ($pages as $page) {

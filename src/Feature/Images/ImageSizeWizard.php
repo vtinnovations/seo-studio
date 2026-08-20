@@ -2,16 +2,18 @@
 
 declare(strict_types=1);
 
-/**
- * @package   vtinnovations/seo-studio
- * @author    VT Innovations Team
- * @license   LGPL-3.0-or-later
- * @copyright VT Innovations 2026
+/*
+ * AI SEO Studio
+ *
+ * Package: vtinnovations/seo-studio
+ * Copyright: VT Innovations Team
+ * Licence: LGPL-3.0-or-later
  */
 
 namespace VTinnovations\SeoStudio\Feature\Images;
 
 use Doctrine\DBAL\Connection;
+use VTinnovations\SeoStudio\Core\Config\Translations;
 
 /**
  * One-click fix: create (or reuse) a responsive tl_image_size preset and
@@ -65,7 +67,7 @@ final class ImageSizeWizard
 
         $themeId = $this->connection->fetchOne('SELECT id FROM tl_theme ORDER BY id LIMIT 1');
         if ($themeId === false) {
-            throw new \RuntimeException('Kein Theme vorhanden — Bildgrößen brauchen ein Theme.');
+            throw new \RuntimeException(Translations::text('error.noTheme'));
         }
 
         $this->connection->insert('tl_image_size', [

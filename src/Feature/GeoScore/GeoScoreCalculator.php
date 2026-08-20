@@ -2,29 +2,30 @@
 
 declare(strict_types=1);
 
-/**
- * @package   vtinnovations/seo-studio
- * @author    VT Innovations Team
- * @license   LGPL-3.0-or-later
- * @copyright VT Innovations 2026
+/*
+ * AI SEO Studio
+ *
+ * Package: vtinnovations/seo-studio
+ * Copyright: VT Innovations Team
+ * Licence: LGPL-3.0-or-later
  */
 
 namespace VTinnovations\SeoStudio\Feature\GeoScore;
 
 use Doctrine\DBAL\Connection;
+use VTinnovations\SeoStudio\Core\Config\Translations;
 use VTinnovations\SeoStudio\Core\Config\ConfigProvider;
 use VTinnovations\SeoStudio\Feature\Audit\AnswerFirstChecker;
 use VTinnovations\SeoStudio\Feature\Audit\HeadingAuditor;
 
 /**
  * GEO readiness score (0-100) per page. Mostly deterministic; the only LLM
- * component is the answer-first check (skipped gracefully without key/budget
- * — the weight is then redistributed so pages aren't punished for a missing
- * API key).
+ * component is the answer-first check. Skipped without key/budget — it then
+ * leaves the score entirely instead of counting as zero.
  *
  * Components (weights):
- *   meta 20 · headings 15 · answerFirst 20 · structuredFormats 10 ·
- *   faq 10 · freshness 15 · schema 10
+ *   meta 25 · answerFirst 20 · headings 15 · structuredFormats 15 · faq 15 ·
+ *   schema 10 = 100. freshness is INFORMATION ONLY (max 0, never scored).
  */
 final class GeoScoreCalculator
 {
@@ -39,7 +40,7 @@ final class GeoScoreCalculator
     /**
      * Computes + persists the score. Returns the components for display.
      *
-     * @return array{score: int, components: array<string, array{points: float, max: int, note: string}>}
+     * @return array{score: int, components: array<string, array{points: float, max: int, note: string, measured?: bool}>}
      */
     public function compute(int $pageId, bool $withLlm = true): array
     {
@@ -49,18 +50,18 @@ final class GeoScoreCalculator
         );
 
         if ($page === false) {
-            throw new \RuntimeException('Seite nicht gefunden.');
+            throw new \RuntimeException(Translations::text('error.pageNotFound'));
         }
 
         $components = [];
 
-        // meta (20)
-        $metaPoints = (trim((string) $page['pageTitle']) !== '' ? 10 : 0)
-            + (trim((string) $page['description']) !== '' ? 10 : 0);
+        // meta (25)
+        $metaPoints = (trim((string) $page['pageTitle']) !== '' ? 12.5 : 0)
+            + (trim((string) $page['description']) !== '' ? 12.5 : 0);
         $components['meta'] = [
             'points' => (float) $metaPoints,
-            'max' => 20,
-            'note' => $metaPoints === 20 ? 'Titel + Beschreibung gesetzt' : 'Seitentitel/Beschreibung unvollständig',
+            'max' => 25,
+            'note' => $metaPoints === 25.0 ? Translations::text('geo.metaComplete') : Translations::text('geo.metaIncomplete'),
         ];
 
         // headings (15)
@@ -71,34 +72,35 @@ final class GeoScoreCalculator
         $components['headings'] = [
             'points' => (float) $headingPoints,
             'max' => 15,
-            'note' => $hasError ? 'Struktur-Fehler (H1)' : ($hasWarning ? 'Ebenen-Sprünge' : 'Struktur sauber'),
+            'note' => $hasError ? Translations::text('geo.structureError') : ($hasWarning ? Translations::text('geo.structureSkips') : Translations::text('geo.structureClean')),
         ];
 
-        // structured formats (10): lists, tables, accordions on the page
+        // structured formats (15): lists, tables, accordions on the page
         $structured = (int) $this->connection->fetchOne(
             "SELECT COUNT(*) FROM tl_content c
              JOIN tl_article a ON a.id = c.pid AND c.ptable IN ('', 'tl_article')
-             WHERE a.pid = ? AND c.invisible = '' AND c.type IN ('list', 'table', 'accordionSingle', 'accordionStart', 'accordion')",
+             WHERE a.pid = ? AND a.published = '1' AND c.invisible = ''
+               AND c.type IN ('list', 'table', 'accordionSingle', 'accordionStart', 'accordion')",
             [$pageId],
         );
         $components['structuredFormats'] = [
-            'points' => $structured > 0 ? 10.0 : 0.0,
-            'max' => 10,
+            'points' => $structured > 0 ? 15.0 : 0.0,
+            'max' => 15,
             'note' => $structured > 0 ? 'Listen/Tabellen vorhanden' : 'Keine Listen/Tabellen (KI-Antworten zitieren strukturierte Formate)',
         ];
 
-        // faq (10)
+        // faq (15)
         $faqCount = (int) $this->connection->fetchOne(
             "SELECT COUNT(*) FROM tl_seo_studio_faq WHERE pid = ? AND published = '1'",
             [$pageId],
         );
         $components['faq'] = [
-            'points' => $faqCount > 0 ? 10.0 : 0.0,
-            'max' => 10,
-            'note' => $faqCount > 0 ? $faqCount . ' veröffentlichte FAQ' : 'Keine FAQ veröffentlicht',
+            'points' => $faqCount > 0 ? 15.0 : 0.0,
+            'max' => 15,
+            'note' => $faqCount > 0 ? Translations::text('geo.faqPublished', $faqCount) : Translations::text('geo.faqNone'),
         ];
 
-        // freshness (15)
+        // freshness — informational only, see below
         $lastmod = max(
             (int) $page['tstamp'],
             (int) $this->connection->fetchOne(
@@ -107,16 +109,16 @@ final class GeoScoreCalculator
             ),
         );
         $ageDays = $lastmod > 0 ? (int) floor((time() - $lastmod) / 86400) : 9999;
-        $freshnessPoints = match (true) {
-            $ageDays <= 14 => 15.0,
-            $ageDays <= 90 => 10.0,
-            $ageDays <= 365 => 5.0,
-            default => 0.0,
-        };
+
+        // INFORMATION, NOT A RATING (max 0). Nobody can touch every page every
+        // fortnight, and a finished page does not get worse by resting. Age is
+        // worth knowing — for news and prices it matters — but it must not
+        // silently drain the score of a perfectly good page.
         $components['freshness'] = [
-            'points' => $freshnessPoints,
-            'max' => 15,
-            'note' => sprintf('Letzte Änderung vor %d Tagen', $ageDays),
+            'points' => 0.0,
+            'max' => 0,
+            'note' => Translations::text('geo.lastChanged', $ageDays),
+            'info' => true,
         ];
 
         // schema (10)
@@ -130,7 +132,9 @@ final class GeoScoreCalculator
         ];
 
         // answer-first (20) — the only LLM component
-        $llmOk = false;
+        // 'measured' => false means NOT MEASURED, not "scored zero". Consumers
+        // must drop the component entirely instead of counting 0 of 20 — an
+        // unrun check would otherwise read as a catastrophic AEO rating.
         if ($withLlm) {
             try {
                 $verdict = $this->answerFirstChecker->check($pageId);
@@ -138,28 +142,42 @@ final class GeoScoreCalculator
                     'points' => round($verdict->score / 100 * 20, 1),
                     'max' => 20,
                     'note' => $verdict->reason,
+                    'measured' => true,
                 ];
-                $llmOk = true;
             } catch (\Throwable $e) {
                 $components['answerFirst'] = [
                     'points' => 0.0,
                     'max' => 20,
-                    'note' => 'KI-Check übersprungen: ' . $e->getMessage(),
+                    'note' => Translations::text('geo.aiCheckSkipped') . $e->getMessage(),
+                    'measured' => false,
                 ];
             }
         } else {
-            $components['answerFirst'] = ['points' => 0.0, 'max' => 20, 'note' => 'KI-Check nicht angefordert'];
+            $components['answerFirst'] = [
+                'points' => 0.0,
+                'max' => 20,
+                'note' => 'KI-Check nicht angefordert',
+                'measured' => false,
+            ];
         }
 
-        // Aggregate. Without the LLM component, scale the deterministic part
-        // to 100 so a missing API key doesn't read as a bad page.
-        $achieved = array_sum(array_map(static fn (array $c): float => $c['points'], $components));
-        $maxTotal = $llmOk ? 100 : 80;
-        if (!$llmOk) {
-            $achieved -= $components['answerFirst']['points'];
+        // Aggregate over what was actually MEASURED and actually counts. A
+        // component with max 0 is pure information (freshness), an unmeasured
+        // one never ran (answer-first without an API key) — neither may drag
+        // the score down, so both stay out of numerator and denominator.
+        $achieved = 0.0;
+        $maxTotal = 0.0;
+
+        foreach ($components as $c) {
+            if (($c['max'] ?? 0) <= 0 || ($c['measured'] ?? true) === false) {
+                continue;
+            }
+
+            $achieved += (float) $c['points'];
+            $maxTotal += (float) $c['max'];
         }
 
-        $score = max(0, min(100, (int) round($achieved / $maxTotal * 100)));
+        $score = $maxTotal > 0.0 ? max(0, min(100, (int) round($achieved / $maxTotal * 100))) : 0;
 
         $this->persist($pageId, $score, $components);
 
@@ -213,7 +231,7 @@ final class GeoScoreCalculator
     }
 
     /**
-     * @param array<string, array{points: float, max: int, note: string}> $components
+     * @param array<string, array{points: float, max: int, note: string, measured?: bool}> $components
      */
     private function persist(int $pageId, int $score, array $components): void
     {

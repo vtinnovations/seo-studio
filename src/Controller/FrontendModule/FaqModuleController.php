@@ -2,11 +2,12 @@
 
 declare(strict_types=1);
 
-/**
- * @package   vtinnovations/seo-studio
- * @author    VT Innovations Team
- * @license   LGPL-3.0-or-later
- * @copyright VT Innovations 2026
+/*
+ * AI SEO Studio
+ *
+ * Package: vtinnovations/seo-studio
+ * Copyright: VT Innovations Team
+ * Licence: LGPL-3.0-or-later
  */
 
 namespace VTinnovations\SeoStudio\Controller\FrontendModule;
@@ -18,6 +19,7 @@ use Contao\ModuleModel;
 use Doctrine\DBAL\Connection;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use VTinnovations\SeoStudio\Core\Config\EntitlementEvaluator;
 use VTinnovations\SeoStudio\Core\Config\FeatureState;
 
 /**
@@ -31,12 +33,19 @@ final class FaqModuleController extends AbstractFrontendModuleController
     public function __construct(
         private readonly Connection $connection,
         private readonly FeatureState $featureState,
+        private readonly EntitlementEvaluator $entitlement,
     ) {
     }
 
     protected function getResponse(FragmentTemplate $template, ModuleModel $model, Request $request): Response
     {
         $page = $this->getPageModel();
+
+        // Unlicensed: the module renders nothing at all. Published FAQ rows stay
+        // in the database untouched and reappear the moment a licence is active.
+        if (!$this->entitlement->isLicensed()) {
+            return new Response('');
+        }
 
         if ($page === null || !$this->featureState->isEnabled('faq')) {
             return new Response('');

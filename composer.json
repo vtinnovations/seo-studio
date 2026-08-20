@@ -10,15 +10,32 @@
     ],
     "require": {
         "php": "^8.2",
+        "ext-json": "*",
+        "ext-sodium": "*",
         "contao/core-bundle": "^5.3",
         "symfony/http-client": "^6.4 || ^7.0",
         "symfony/http-foundation": "^6.4 || ^7.0",
         "defuse/php-encryption": "^2.4"
     },
+    "require-dev": {
+        "phpunit/phpunit": "^10.5 || ^11.0"
+    },
+    "suggest": {
+        "ext-curl": "Used for the server-to-server usage signals",
+        "ext-intl": "Required to activate a licence on an internationalised domain name"
+    },
     "autoload": {
         "psr-4": {
             "VTinnovations\\SeoStudio\\": "src/"
         }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "VTinnovations\\SeoStudio\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "release-guard": "@php tools/release-guard.php"
     },
     "extra": {
         "contao-manager-plugin": "VTinnovations\\SeoStudio\\ContaoManager\\Plugin"

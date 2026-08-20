@@ -2,17 +2,20 @@
 
 declare(strict_types=1);
 
-/**
- * @package   vtinnovations/seo-studio
- * @author    VT Innovations Team
- * @license   LGPL-3.0-or-later
- * @copyright VT Innovations 2026
+/*
+ * AI SEO Studio
+ *
+ * Package: vtinnovations/seo-studio
+ * Copyright: VT Innovations Team
+ * Licence: LGPL-3.0-or-later
  */
 
 namespace VTinnovations\SeoStudio\Core\Ai;
 
 use Psr\Log\LoggerInterface;
 use VTinnovations\SeoStudio\Core\Config\ConfigProvider;
+use VTinnovations\SeoStudio\Core\Config\EntitlementEvaluator;
+use VTinnovations\SeoStudio\Core\Config\Translations;
 use VTinnovations\SeoStudio\Core\Security\BudgetExceededException;
 use VTinnovations\SeoStudio\Core\Security\TokenBudget;
 
@@ -32,6 +35,7 @@ final class AiGateway
         private readonly ConfigProvider $config,
         private readonly TokenBudget $budget,
         private readonly LoggerInterface $logger,
+        private readonly EntitlementEvaluator $entitlement,
     ) {
     }
 
@@ -41,6 +45,13 @@ final class AiGateway
      */
     public function complete(PromptBundle $bundle): AiResponse
     {
+        // Independent gate at the paid-capability boundary: whatever called us —
+        // a controller, a DCA panel, the cron, a future service — no generation
+        // happens without a valid licence.
+        if (!$this->entitlement->isLicensed()) {
+            throw new \RuntimeException(Translations::text('error.notLicensed'));
+        }
+
         $this->budget->assertBudgetAvailable();
 
         $client = $this->factory->default();

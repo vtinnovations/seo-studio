@@ -22,6 +22,14 @@ seo_studio.page_suggest_keyword:
         _token_check: true
     methods: [POST]
 
+seo_studio.list_scores:
+    path: /contao/seostudio/list-scores
+    defaults:
+        _controller: VTinnovations\SeoStudio\Controller\ListScoreController::scoresAction
+        _scope: backend
+        _token_check: true
+    methods: [POST]
+
 seo_studio.optimize:
     path: /contao/seostudio/optimize
     defaults:
@@ -45,6 +53,18 @@ seo_studio.faq_generate:
         _scope: backend
         _token_check: true
     methods: [POST]
+
+# Vendor-initiated provisioning updates. Public by necessity (server-to-server,
+# no browser session), authenticated by request signature instead of CSRF.
+# GET/HEAD are routed on purpose so the handler can answer 405 with Allow: POST
+# rather than letting Contao resolve the path as a missing page (404).
+seo_studio.provisioning_callback:
+    path: /rest/api/v1/seo-studio-license-updater
+    defaults:
+        _controller: VTinnovations\SeoStudio\Controller\ExchangeCallbackController
+        _token_check: false
+        _bypass_maintenance: true
+    methods: [POST, GET, HEAD]
 
 seo_studio.llms_txt:
     path: /llms.txt

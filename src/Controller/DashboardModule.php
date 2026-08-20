@@ -2,11 +2,12 @@
 
 declare(strict_types=1);
 
-/**
- * @package   vtinnovations/seo-studio
- * @author    VT Innovations Team
- * @license   LGPL-3.0-or-later
- * @copyright VT Innovations 2026
+/*
+ * AI SEO Studio
+ *
+ * Package: vtinnovations/seo-studio
+ * Copyright: VT Innovations Team
+ * Licence: LGPL-3.0-or-later
  */
 
 namespace VTinnovations\SeoStudio\Controller;
@@ -33,14 +34,85 @@ final class DashboardModule
     use BackendTabsTrait;
 
     /**
+     * A fully written-out example per task — the thing that turns "insert a
+     * list element" into something you can copy, adapt and be done with.
+     *
+     * Deliberately static: it costs nothing, is instant, and is available even
+     * without an API key. For text tailored to a specific page, "Mit KI
+     * optimieren" sits directly on the element.
+     *
+     * Trusted authored HTML — never concatenated with user data.
+     */
+    private const EXAMPLES = [
+        'meta' => '<p><strong>Statt leer oder „Startseite“:</strong></p>'
+            . '<p class="seo-studio-ex-label">Seitentitel (50–60 Zeichen)</p>'
+            . '<pre>Webdesign für Freelancer — V&amp;T Innovations</pre>'
+            . '<p class="seo-studio-ex-label">Beschreibung (120–155 Zeichen)</p>'
+            . '<pre>Wir bauen Contao-Websites für Freelancer und kleine Teams. '
+            . 'Von der Konzeption bis zur Übergabe — in vier Wochen online.</pre>'
+            . '<p class="seo-studio-ex-hint">Regel: Der Titel nennt <em>Leistung + Zielgruppe</em>, die Beschreibung '
+            . 'endet mit einem konkreten Nutzen. Beide Felder füllt „Titel &amp; Beschreibungen erzeugen“ auch per KI.</p>',
+
+        'headings' => '<p><strong>Falsch</strong> — zwei H1, und H2 wird übersprungen:</p>'
+            . "<pre>H1  Willkommen\nH1  Unsere Leistungen\nH3  Beratung</pre>"
+            . '<p><strong>Richtig</strong> — eine H1, lückenlose Ebenen:</p>'
+            . "<pre>H1  Webdesign für Freelancer\nH2  Unsere Leistungen\nH3  Beratung\nH3  Umsetzung\nH2  Ablauf und Preise</pre>"
+            . '<p class="seo-studio-ex-hint">Die Ebene stellst du am Inhaltselement im Feld neben der Überschrift ein '
+            . '(h1–h6). Untergeordnetes bekommt die nächsthöhere Zahl — nie zwei Stufen auf einmal.</p>',
+
+        'structuredFormats' => '<p><strong>Statt Fließtext:</strong> „Wir bieten Beratung, Umsetzung und Wartung an, '
+            . 'außerdem kümmern wir uns um Hosting und Schulungen.“</p>'
+            . '<p><strong>Als Aufzählung</strong> (Inhaltselement „Aufzählung“):</p>'
+            . "<pre>Unsere Leistungen im Überblick\n\n• Beratung — Konzept, Struktur, Zielgruppe\n"
+            . "• Umsetzung — Contao-Website, responsiv, barrierefrei\n• Wartung — Updates, Backups, Support\n"
+            . "• Hosting — deutsche Server, DSGVO-konform\n• Schulung — damit du selbst pflegen kannst</pre>"
+            . '<p><strong>Oder als Tabelle</strong> (Inhaltselement „Tabelle“), wenn du Werte vergleichst:</p>'
+            . "<pre>Paket    | Umfang           | Preis\nBasis    | 5 Seiten         | ab 1.900 €\n"
+            . 'Business | 15 Seiten + Blog | ab 3.900 €</pre>'
+            . '<p class="seo-studio-ex-hint">Warum das zählt: ChatGPT und Google-KI zitieren solche Blöcke fast wörtlich, '
+            . 'weil sie sich sauber aus der Seite herausschneiden lassen. Ein Element pro Seite genügt.</p>',
+
+        'faq' => '<p><strong>Drei echte Fragen, wie ein Kunde sie stellt:</strong></p>'
+            . "<pre>F: Was kostet eine Contao-Website?\nA: Eine Website mit fünf Seiten kostet ab 1.900 €. "
+            . 'Der Preis hängt von Seitenzahl, Funktionen und Designaufwand ab. Ein Festpreis-Angebot bekommst du nach '
+            . 'einem 30-minütigen Gespräch.</pre>'
+            . "<pre>F: Wie lange dauert die Umsetzung?\nA: Vier bis sechs Wochen ab Auftrag. Die Hälfte der Zeit "
+            . 'entfällt auf Inhalte — je früher deine Texte und Bilder da sind, desto schneller geht es live.</pre>'
+            . "<pre>F: Kann ich die Seite später selbst pflegen?\nA: Ja. Contao ist dafür gebaut, und zur Übergabe "
+            . 'gehört eine einstündige Einweisung. Texte, Bilder und neue Seiten pflegst du danach ohne uns.</pre>'
+            . '<p class="seo-studio-ex-hint">Merkmale einer guten FAQ-Antwort: <em>erster Satz beantwortet die Frage '
+            . 'vollständig</em>, danach ein bis zwei Sätze Begründung. Keine Rückfragen, kein „das kommt darauf an“ '
+            . 'als erstes Wort. Unter „FAQ“ erzeugt die KI Entwürfe aus deinen echten Seiteninhalten.</p>',
+
+        'answerFirst' => '<p><strong>Vorher</strong> — der Leser wartet vier Zeilen auf die Antwort:</p>'
+            . '<pre>In der heutigen digitalen Welt ist eine professionelle Onlinepräsenz wichtiger denn je. '
+            . 'Viele Unternehmen stehen vor der Herausforderung, sich im Netz zu behaupten. Wir bei V&amp;T '
+            . 'begleiten Sie auf diesem Weg. Wir entwickeln Websites für Freelancer.</pre>'
+            . '<p><strong>Nachher</strong> — Antwort in Satz 1, Begründung danach:</p>'
+            . '<pre>Wir entwickeln Contao-Websites für Freelancer und kleine Teams. In vier bis sechs Wochen '
+            . 'steht deine Seite — Konzept, Design und Umsetzung aus einer Hand. Danach pflegst du die Inhalte '
+            . 'selbst, ohne uns anrufen zu müssen.</pre>'
+            . '<p class="seo-studio-ex-hint">Test: Deck alles ab dem zweiten Satz ab. Steht die Antwort trotzdem da? '
+            . 'Dann passt es. Streiche jeden Aufwärmsatz — „In der heutigen Zeit“, „Willkommen“, „Wussten Sie schon“.</p>',
+
+        'schema' => '<p><strong>In Einstellungen → Strukturierte Daten, Feld „Organisation: Name“:</strong></p>'
+            . '<pre>V&amp;T Innovations</pre>'
+            . '<p class="seo-studio-ex-hint">Der Name, unter dem dich Kunden kennen — mit Rechtsform, wenn du sie '
+            . 'sonst auch führst („Muster GmbH“). Ein Feld, einmal ausfüllen, wirkt auf allen Seiten.</p>',
+    ];
+
+    /**
      * Maps each GeoScoreCalculator component to a search-visibility layer:
      * SEO (classic findability), GEO (generative search), AEO (answer engines).
+     *
+     * 'freshness' is deliberately absent: page age is information, not a
+     * verdict. Nobody can revisit every page every fortnight, and a finished
+     * page does not get worse by resting.
      */
     private const SCORE_BUCKET = [
         'meta' => 'seo',
         'headings' => 'seo',
         'structuredFormats' => 'geo',
-        'freshness' => 'geo',
         'schema' => 'geo',
         'answerFirst' => 'aeo',
         'faq' => 'aeo',
@@ -48,6 +120,11 @@ final class DashboardModule
 
     public function generate(): string
     {
+        $notice = $this->entitlementNotice();
+        if ($notice !== null) {
+            return $notice;
+        }
+
         $container = System::getContainer();
 
         /** @var FeatureState $featureState */
@@ -70,14 +147,12 @@ final class DashboardModule
 
         $html = '<div id="tl_buttons"></div>' . Message::generate();
 
-        $html .= $this->renderLicenseBanner($e, $container);
         $html .= $this->renderRootFilter($e, $rootScope, $rootId, 'seo_dashboard');
 
         if (!$secrets->has('ai_api_key')) {
             $html .= '<div class="seo-studio-hint seo-studio-hint--warn">'
-                . '<strong>KI noch nicht verbunden.</strong> Die Prüfungen (Crawler, Struktur, Bilder) laufen bereits; '
-                . 'für Text- und Meta-Generierung unter <a href="' . $e($this->moduleUrl('seo_settings')) . '">Einstellungen</a> '
-                . 'einen KI-Anbieter + Schlüssel eintragen.</div>';
+                . $this->transf('dash.aiMissing', $e($this->moduleUrl('seo_settings')))
+                . '</div>';
         }
 
         $html .= '<div class="seo-studio-dash">';
@@ -112,6 +187,7 @@ final class DashboardModule
             'seoPart' => null,
             'geoPart' => null,
             'aeoPart' => null,
+            'layerHints' => ['seo' => [], 'geo' => [], 'aeo' => []],
             'freshEnabled' => $featureState->isEnabled('freshness'),
             'stale' => 0,
             'imagesEnabled' => $featureState->isEnabled('images'),
@@ -150,9 +226,22 @@ final class DashboardModule
                 $d['geoMid'] = (int) $db->fetchOne("SELECT COUNT(*) FROM tl_seo_studio_score WHERE $cond AND score >= 50 AND score < 80", $params, $types);
                 $d['geoBad'] = (int) $db->fetchOne("SELECT COUNT(*) FROM tl_seo_studio_score WHERE $cond AND score < 50", $params, $types);
 
-                [$d['seoPart'], $d['geoPart'], $d['aeoPart']] = $this->scoreBreakdown(
-                    $db->fetchFirstColumn("SELECT components FROM tl_seo_studio_score WHERE $cond", $params, $types),
-                );
+                $scoreRows = $db->fetchAllAssociative(
+                    "SELECT s.pageId, s.components, p.title FROM tl_seo_studio_score s
+                     JOIN tl_page p ON p.id = s.pageId WHERE $cond",
+                    $params,
+                    $types);
+                [$d['seoPart'], $d['geoPart'], $d['aeoPart']] = $this->scoreBreakdown(array_column($scoreRows, 'components'));
+
+                // One article per page, so a task can link to the exact content
+                // element list instead of dumping the user in the article tree.
+                $articleByPage = [];
+                foreach ($db->fetchAllAssociative(
+                    "SELECT pid, MIN(id) AS id FROM tl_article WHERE published = '1' GROUP BY pid") as $row) {
+                    $articleByPage[(int) $row['pid']] = (int) $row['id'];
+                }
+
+                $d['layerHints'] = $this->layerHints($scoreRows, $articleByPage);
             }
         }
 
@@ -229,6 +318,18 @@ final class DashboardModule
                 if ($layer === null || !\is_array($c)) {
                     continue;
                 }
+
+                // A check that never ran must not drag its layer down. Counting
+                // an unrun answer-first check as 0/20 turned a perfectly fine
+                // page into "AEO 33". Scores written before this flag existed
+                // are recognised by their note.
+                $measured = $c['measured']
+                    ?? !str_starts_with((string) ($c['note'] ?? ''), 'KI-Check ');
+
+                if (!$measured) {
+                    continue;
+                }
+
                 $bucket[$layer][0] += (float) ($c['points'] ?? 0);
                 $bucket[$layer][1] += (float) ($c['max'] ?? 0);
             }
@@ -240,6 +341,157 @@ final class DashboardModule
     }
 
     /**
+     * Turns the weakest components into a NAMED TO-DO LIST, not a diagnosis.
+     *
+     * "2 von 2 Seiten: keine Liste" leaves the reader asking *which* page and
+     * *where do I click*. So every entry names one page, states one action in
+     * the imperative, shows what it is worth, and links to the exact screen
+     * that performs it. Sorted by points, because the top row should always be
+     * the one worth doing first.
+     *
+     * @param list<array<string, mixed>> $rows pageId + title + components JSON
+     * @param array<int, int> $articleByPage pageId => first published article id
+     * @return array<string, list<array{0: string, 1: string, 2: string, 3: string}>> layer => [text, cta, url, exampleHtml]
+     */
+    private function layerHints(array $rows, array $articleByPage = []): array
+    {
+        $tasks = ['seo' => [], 'geo' => [], 'aeo' => []];
+        $schemaPages = 0;
+        $unmeasured = 0;
+
+        // Several roots happily share the title "Startseite". Two identical
+        // task rows would be unusable, so ambiguous titles carry their ID.
+        $titleCount = array_count_values(array_map(
+            static fn (array $r): string => trim((string) ($r['title'] ?? '')),
+            $rows));
+
+        foreach ($rows as $row) {
+            $components = json_decode((string) ($row['components'] ?? ''), true);
+            if (!\is_array($components)) {
+                continue;
+            }
+
+            $pageId = (int) ($row['pageId'] ?? 0);
+            $title = trim((string) ($row['title'] ?? '')) ?: 'Seite ' . $pageId;
+            if (($titleCount[$title] ?? 0) > 1) {
+                $title .= ' (ID ' . $pageId . ')';
+            }
+            $articleId = $articleByPage[$pageId] ?? 0;
+
+            // Where the content of this page is actually edited.
+            $contentUrl = $articleId > 0
+                ? $this->backendUrl(['do' => 'article', 'table' => 'tl_content', 'id' => $articleId])
+                : $this->moduleUrl('article');
+            $pageUrl = $this->backendUrl(['do' => 'page', 'act' => 'edit', 'id' => $pageId]);
+
+            foreach ($components as $key => $c) {
+                $layer = self::SCORE_BUCKET[$key] ?? null;
+                if ($layer === null || !\is_array($c)) {
+                    continue;
+                }
+
+                $measured = $c['measured'] ?? !str_starts_with((string) ($c['note'] ?? ''), 'KI-Check ');
+                if (!$measured) {
+                    ++$unmeasured;
+                    continue;
+                }
+
+                $gain = (int) round((float) ($c['max'] ?? 0) - (float) ($c['points'] ?? 0));
+                if ($gain <= 0) {
+                    continue;
+                }
+
+                // Schema is one site-wide setting, not a per-page job — counted
+                // here, emitted once below.
+                if ($key === 'schema') {
+                    ++$schemaPages;
+                    continue;
+                }
+
+                $openContent = $this->trans('task.openContent');
+
+                $task = match ($key) {
+                    'meta' => [$this->trans('task.meta'), $this->trans('task.openPage'), $pageUrl],
+                    'headings' => [$this->trans('task.headings'), $openContent, $contentUrl],
+                    'structuredFormats' => [$this->trans('task.structuredFormats'), $openContent, $contentUrl],
+                    'faq' => [$this->trans('task.faq'), $this->trans('task.openFaq'), $this->moduleUrl('seo_faq')],
+                    'answerFirst' => [$this->trans('task.answerFirst'), $openContent, $contentUrl],
+                    default => null,
+                };
+
+                if ($task === null) {
+                    continue;
+                }
+
+                $tasks[$layer][] = [$gain, '„' . $title . '“ — ' . $task[0] . ' (+' . $gain . ')', $task[1], $task[2], $this->example($key)];
+            }
+        }
+
+        if ($schemaPages > 0) {
+            $tasks['geo'][] = [
+                3 * $schemaPages,
+                $this->transf('task.schema', $schemaPages),
+                $this->trans('task.openSettings'),
+                $this->moduleUrl('seo_settings'),
+                $this->example('schema'),
+            ];
+        }
+
+        if ($unmeasured > 0) {
+            $tasks['aeo'][] = [
+                0,
+                $this->transf('task.unmeasured', $unmeasured),
+                $this->trans('task.computeWithAi'),
+                $this->moduleUrl('seo_analyse'),
+                '',
+            ];
+        }
+
+        // Biggest win first, then trim: a list of twenty is as useless as none.
+        $hints = [];
+        foreach ($tasks as $layer => $list) {
+            usort($list, static fn (array $a, array $b): int => $b[0] <=> $a[0]);
+            $rest = \count($list) - 4;
+            $list = \array_slice($list, 0, 4);
+
+            $hints[$layer] = array_map(static fn (array $t): array => [$t[1], $t[2], $t[3], $t[4] ?? ''], $list);
+
+            if ($rest > 0) {
+                $hints[$layer][] = [
+                    $this->transf('task.more', $rest),
+                    $this->trans('task.checkAll'),
+                    $this->moduleUrl('seo_analyse'),
+                    '',
+                ];
+            }
+        }
+
+        return $hints;
+    }
+
+    /**
+     * The worked example for a component, translated when a language file
+     * supplies one. German lives in {@see EXAMPLES} as the fallback.
+     */
+    private function example(string $key): string
+    {
+        return isset(self::EXAMPLES[$key])
+            ? $this->trans('examples.' . $key)
+            : '';
+    }
+
+    /**
+     * @param array<string, int|string> $params
+     */
+    private function backendUrl(array $params): string
+    {
+        $router = System::getContainer()->get('router');
+        \assert($router instanceof \Symfony\Component\Routing\RouterInterface);
+
+        return $router->generate('contao_backend', $params);
+    }
+
+    /**
      * @param array<string, mixed> $d
      */
     private function renderHealth(callable $e, array $d): string
@@ -247,13 +499,12 @@ final class DashboardModule
         // Overall health = GEO score average when present, otherwise a simple
         // coverage score so the ring is never empty on a fresh install.
         $score = $d['geoAvg'];
-        $label = 'SEO · GEO · AEO Score';
-        $sub = $d['geoScored'] . ' von ' . $d['totalPages'] . ' Seiten bewertet — kombiniert klassisches SEO, GEO (generative Suche) und AEO (Antwort-Engines)';
+        $label = $this->trans('dash.scoreTitle');
+        $sub = $this->transf('dash.scoreSub', $d['geoScored'], $d['totalPages']);
 
         if ($score === null) {
             $score = $this->coverageScore($d);
-            $label = 'SEO · GEO · AEO Score';
-            $sub = 'geschätzt aus Abdeckung — für den vollen SEO/GEO/AEO-Score einmal „SEO·GEO·AEO-Score berechnen“ (Analyse) laufen lassen';
+            $sub = $this->trans('dash.scoreSubEstimated');
         }
 
         $color = $score >= 80 ? 'good' : ($score >= 50 ? 'mid' : 'bad');
@@ -265,9 +516,9 @@ final class DashboardModule
 
         if ($d['geoAvg'] !== null && $d['geoScored'] > 0) {
             $card .= '<div class="seo-studio-legend">'
-                . '<span><i class="dot dot--good"></i>' . $d['geoGood'] . ' gut</span>'
-                . '<span><i class="dot dot--mid"></i>' . $d['geoMid'] . ' mittel</span>'
-                . '<span><i class="dot dot--bad"></i>' . $d['geoBad'] . ' schwach</span>'
+                . '<span><i class="dot dot--good"></i>' . $d['geoGood'] . ' ' . $e($this->trans('dash.good')) . '</span>'
+                . '<span><i class="dot dot--mid"></i>' . $d['geoMid'] . ' ' . $e($this->trans('dash.mid')) . '</span>'
+                . '<span><i class="dot dot--bad"></i>' . $d['geoBad'] . ' ' . $e($this->trans('dash.bad')) . '</span>'
                 . '</div>';
         }
 
@@ -285,25 +536,43 @@ final class DashboardModule
     private function renderTriScore(callable $e, array $d): string
     {
         $layers = [
-            ['SEO', $d['seoPart'], 'Klassische Suche'],
-            ['GEO', $d['geoPart'], 'Generative Suche'],
-            ['AEO', $d['aeoPart'], 'Antwort-Engines'],
+            ['SEO', $d['seoPart'], $this->trans('dash.layerSeo'), 'seo'],
+            ['GEO', $d['geoPart'], $this->trans('dash.layerGeo'), 'geo'],
+            ['AEO', $d['aeoPart'], $this->trans('dash.layerAeo'), 'aeo'],
         ];
 
         if ($d['seoPart'] === null && $d['geoPart'] === null && $d['aeoPart'] === null) {
-            return '<p class="seo-studio-card-sub">SEO-/GEO-/AEO-Aufteilung erscheint, sobald der Score berechnet ist (Analyse → „Scores berechnen“).</p>';
+            return '<p class="seo-studio-card-sub">' . $e($this->trans('dash.triScorePending')) . '</p>';
         }
 
+        $hints = \is_array($d['layerHints'] ?? null) ? $d['layerHints'] : [];
+
         $html = '<div class="seo-studio-triscore">';
-        foreach ($layers as [$labelText, $value, $desc]) {
+        foreach ($layers as [$labelText, $value, $desc, $key]) {
             $v = (int) $value;
             $color = $v >= 80 ? 'good' : ($v >= 50 ? 'mid' : 'bad');
             $html .= '<div class="seo-studio-triscore-row">'
                 . '<div class="seo-studio-triscore-head">'
                 . '<span><strong>' . $e($labelText) . '</strong> <span class="seo-studio-muted">' . $e($desc) . '</span></span>'
                 . '<span>' . ($value === null ? '–' : $v) . '</span></div>'
-                . '<div class="seo-studio-bar"><div class="seo-studio-bar-fill seo-studio-bar-fill--' . $color . '" style="width:' . $v . '%"></div></div>'
-                . '</div>';
+                . '<div class="seo-studio-bar"><div class="seo-studio-bar-fill seo-studio-bar-fill--' . $color . '" style="width:' . $v . '%"></div></div>';
+
+            // What to actually do about a weak layer — named, counted, linked,
+            // and with a written-out example one click away.
+            foreach ($hints[$key] ?? [] as $hint) {
+                [$text, $cta, $url] = $hint;
+                $example = $hint[3] ?? '';
+
+                $html .= '<p class="seo-studio-layerhint">' . $e($text)
+                    . ' <a href="' . $e($url) . '">' . $e($cta) . ' →</a></p>';
+
+                if ($example !== '') {
+                    $html .= '<details class="seo-studio-example"><summary>' . $e($this->trans('dash.showExample')) . '</summary>'
+                        . '<div class="seo-studio-example-body">' . $example . '</div></details>';
+                }
+            }
+
+            $html .= '</div>';
         }
 
         return $html . '</div>';
@@ -318,28 +587,40 @@ final class DashboardModule
 
         if ($d['metaEnabled'] && $d['totalPages'] > 0) {
             $done = $d['totalPages'] - $d['metaOpen'];
-            $bars[] = ['Titel & Beschreibungen', $done, $d['totalPages']];
+            $bars[] = [$this->trans('dash.barMeta'), $done, $d['totalPages']];
         }
         if ($d['freshEnabled'] && $d['totalPages'] > 0) {
-            $bars[] = ['Aktualität (≤ 14 Tage)', $d['totalPages'] - $d['stale'], $d['totalPages']];
+            // Neutral bar: this one informs, it does not judge.
+            $bars[] = [$this->trans('dash.barFreshness'), $d['totalPages'] - $d['stale'], $d['totalPages'], null, 'info'];
         }
         if ($d['imagesEnabled']) {
             $totalImg = (int) $d['imagesUnassigned'];
             // We only know the unassigned count cheaply; show it as a simple gauge.
-            $bars[] = ['Bilder mit Bildgröße', $totalImg === 0 ? 1 : 0, 1, $totalImg === 0 ? 'alle zugewiesen' : $totalImg . ' offen'];
+            $bars[] = [
+                $this->trans('dash.barImages'),
+                $totalImg === 0 ? 1 : 0,
+                1,
+                $totalImg === 0 ? $this->trans('dash.allAssigned') : $this->transf('dash.nOpen', $totalImg),
+            ];
         }
         if ($d['auditEnabled']) {
+            $crawlerLabel = $this->trans('dash.barCrawlers');
             if ($d['crawlersChecked']) {
-                $bars[] = ['KI-Crawler erlaubt', $d['crawlersBlocked'] === 0 ? 1 : 0, 1, $d['crawlersBlocked'] === 0 ? 'alle erlaubt' : $d['crawlersBlocked'] . ' blockiert'];
+                $bars[] = [
+                    $crawlerLabel,
+                    $d['crawlersBlocked'] === 0 ? 1 : 0,
+                    1,
+                    $d['crawlersBlocked'] === 0 ? $this->trans('dash.allAllowed') : $this->transf('dash.nBlocked', $d['crawlersBlocked']),
+                ];
             } else {
-                $bars[] = ['KI-Crawler erlaubt', 0, 1, 'noch nicht geprüft'];
+                $bars[] = [$crawlerLabel, 0, 1, $this->trans('dash.notCheckedYet')];
             }
         }
 
-        $html = '<div class="seo-studio-card seo-studio-card--coverage"><h3>Abdeckung</h3>';
+        $html = '<div class="seo-studio-card seo-studio-card--coverage"><h3>' . $e($this->trans('dash.coverage')) . '</h3>';
 
         if ($bars === []) {
-            return $html . '<p class="seo-studio-card-sub">Keine Abdeckungs-Kennzahlen (Funktionen deaktiviert).</p></div>';
+            return $html . '<p class="seo-studio-card-sub">' . $e($this->trans('dash.noCoverage')) . '</p></div>';
         }
 
         foreach ($bars as $bar) {
@@ -348,7 +629,9 @@ final class DashboardModule
             $total = max(1, (int) $bar[2]);
             $pct = (int) round($done / $total * 100);
             $note = $bar[3] ?? ($done . ' / ' . $total);
-            $color = $pct >= 80 ? 'good' : ($pct >= 50 ? 'mid' : 'bad');
+            $color = ($bar[4] ?? '') === 'info'
+                ? 'info'
+                : ($pct >= 80 ? 'good' : ($pct >= 50 ? 'mid' : 'bad'));
 
             $html .= '<div class="seo-studio-bar-row">'
                 . '<div class="seo-studio-bar-head"><span>' . $e($labelText) . '</span><span class="seo-studio-muted">' . $e((string) $note) . '</span></div>'
@@ -367,34 +650,36 @@ final class DashboardModule
         $todos = [];
 
         if ($d['metaEnabled'] && $d['metaOpen'] > 0) {
-            $todos[] = ['mid', $d['metaOpen'] . ' Seite(n) ohne Titel/Beschreibung', 'Inhalte & Meta öffnen', $this->moduleUrl('seo_generate')];
+            $todos[] = ['mid', $this->transf('todo.meta', $d['metaOpen']), $this->trans('todo.metaCta'), $this->moduleUrl('seo_generate')];
         }
         if ($d['imagesEnabled'] && $d['imagesUnassigned'] > 0) {
-            $todos[] = ['mid', $d['imagesUnassigned'] . ' Bild(er) ohne Bildgröße', 'Bild-Assistent (Analyse)', $this->moduleUrl('seo_analyse')];
+            $todos[] = ['mid', $this->transf('todo.images', $d['imagesUnassigned']), $this->trans('todo.imagesCta'), $this->moduleUrl('seo_analyse')];
         }
         if ($d['auditEnabled'] && $d['crawlersChecked'] && (int) $d['crawlersBlocked'] > 0) {
-            $todos[] = ['bad', $d['crawlersBlocked'] . ' KI-Crawler blockiert', 'Crawler-Audit (Analyse)', $this->moduleUrl('seo_analyse')];
+            $todos[] = ['bad', $this->transf('todo.crawlersBlocked', $d['crawlersBlocked']), $this->trans('todo.crawlersCta'), $this->moduleUrl('seo_analyse')];
         }
         if ($d['auditEnabled'] && !$d['crawlersChecked']) {
-            $todos[] = ['mid', 'Crawler-Zugang noch nicht geprüft', 'Jetzt prüfen (Analyse)', $this->moduleUrl('seo_analyse')];
+            $todos[] = ['mid', $this->trans('todo.crawlersUnchecked'), $this->trans('todo.crawlersCheckCta'), $this->moduleUrl('seo_analyse')];
         }
         if ($d['freshEnabled'] && $d['stale'] > 0) {
-            $todos[] = ['mid', $d['stale'] . ' Seite(n) seit über 14 Tagen unverändert', 'Aktualität (Analyse)', $this->moduleUrl('seo_analyse')];
+            // Info, not a defect: age is worth knowing for news and prices,
+            // but an untouched page is not a broken page.
+            $todos[] = ['info', $this->transf('todo.stale', $d['stale']), $this->trans('todo.staleCta'), $this->moduleUrl('seo_analyse')];
         }
         if ($d['geoEnabled'] && $d['geoScored'] === 0) {
-            $todos[] = ['mid', 'GEO-Score noch nie berechnet', 'GEO-Score (Analyse)', $this->moduleUrl('seo_analyse')];
+            $todos[] = ['mid', $this->trans('todo.noScore'), $this->trans('todo.noScoreCta'), $this->moduleUrl('seo_analyse')];
         }
         if ($d['faqEnabled'] && (int) $d['faqDrafts'] > 0) {
-            $todos[] = ['info', $d['faqDrafts'] . ' FAQ-Entwurf/-Entwürfe warten auf Freigabe', 'FAQ kuratieren', $this->moduleUrl('seo_faq')];
+            $todos[] = ['info', $this->transf('todo.faqDrafts', $d['faqDrafts']), $this->trans('todo.faqCta'), $this->moduleUrl('seo_faq')];
         }
         if ($d['glossaryEnabled'] && (int) $d['glossaryDrafts'] > 0) {
-            $todos[] = ['info', $d['glossaryDrafts'] . ' Glossar-Entwurf/-Entwürfe warten auf Freigabe', 'Glossar kuratieren', $this->moduleUrl('seo_glossary')];
+            $todos[] = ['info', $this->transf('todo.glossaryDrafts', $d['glossaryDrafts']), $this->trans('todo.glossaryCta'), $this->moduleUrl('seo_glossary')];
         }
 
-        $html = '<div class="seo-studio-card seo-studio-card--todos"><h3>Zu erledigen</h3>';
+        $html = '<div class="seo-studio-card seo-studio-card--todos"><h3>' . $e($this->trans('todo.heading')) . '</h3>';
 
         if ($todos === []) {
-            return $html . '<p class="tl_confirm" style="margin:0">Alles im grünen Bereich — keine offenen Punkte.</p></div>';
+            return $html . '<p class="tl_confirm" style="margin:0">' . $e($this->trans('todo.allClear')) . '</p></div>';
         }
 
         $html .= '<ul class="seo-studio-todos">';
@@ -410,8 +695,7 @@ final class DashboardModule
 
     private function renderExplainers(callable $e): string
     {
-        return '<details class="seo-studio-explainer"><summary>Was macht AI SEO Studio? &amp; warum erscheinen Titel „von allein“?</summary>'
-            . '<p>Die Suite unterstützt dich beim SEO/GEO/AEO deiner Website — direkt im Backend. Drei Bereiche:</p>'
+        $body = '<p>Die Suite unterstützt dich beim SEO/GEO/AEO deiner Website — direkt im Backend. Drei Bereiche:</p>'
             . '<ul>'
             . '<li><strong>Inhalte &amp; Meta</strong> — Titel/Beschreibungen und Glossar-Definitionen per KI erzeugen (nur leere Felder).</li>'
             . '<li><strong>Analyse</strong> — Crawler-Zugang, Struktur, Duplikate, GEO-Score, Aktualität und Bilder prüfen.</li>'
@@ -420,8 +704,11 @@ final class DashboardModule
             . '<p>Einzelne Text- und Überschriften-Blöcke optimierst du direkt am Inhaltselement über „Mit KI optimieren“.</p>'
             . '<p><strong>SEO Studio erzeugt nichts von allein.</strong> Jede KI-Aktion läuft nur auf deinen Klick (oder den optionalen, '
             . 'standardmäßig ausgeschalteten Cron). Ein Frontend-Titel wie <code>„Seite - Websitename“</code> kommt von Contao selbst — '
-            . 'es hängt den Startpunkt-Namen an und nutzt bei leerem Seitentitel den Navigationsnamen.</p>'
-            . '</details>';
+            . 'es hängt den Startpunkt-Namen an und nutzt bei leerem Seitentitel den Navigationsnamen.</p>';
+
+        return '<details class="seo-studio-explainer"><summary>'
+            . $e($this->trans('explain.summary'))
+            . '</summary>' . $this->trans('explain.body') . '</details>';
     }
 
     /**
@@ -492,27 +779,4 @@ final class DashboardModule
         return $request !== null ? (int) $request->query->get('root', 0) : 0;
     }
 
-    /**
-     * @param callable(mixed):string $e
-     */
-    private function renderLicenseBanner(callable $e, mixed $container): string
-    {
-        $guard = $container->get(\VTinnovations\SeoStudio\Core\Security\LicenseGuard::class);
-        if (!$guard instanceof \VTinnovations\SeoStudio\Core\Security\LicenseGuard) {
-            return '';
-        }
-
-        return match ($guard->state()) {
-            \VTinnovations\SeoStudio\Core\Security\LicenseGuard::STATE_DEMO => '<div class="seo-studio-license seo-studio-license--demo">'
-                . '<strong>Demo-Lizenz</strong> — noch ' . $guard->demoDaysLeft() . ' Tag(e). '
-                . 'Einige Funktionen sind gesperrt. Vollversion schaltet alles frei: '
-                . '<a href="https://v-t.one" target="_blank" rel="noreferrer">v-t.one</a>.</div>',
-            \VTinnovations\SeoStudio\Core\Security\LicenseGuard::STATE_UNLICENSED => '<div class="seo-studio-license seo-studio-license--expired">'
-                . '<strong>Keine gültige Lizenz.</strong> Trage deinen Lizenzschlüssel ein '
-                . '(<a href="' . $e($this->moduleUrl('seo_settings')) . '">Einstellungen → Lizenz</a>) — '
-                . 'auch die Demo benötigt einen Schlüssel. Kostenlose Demo &amp; Vollversion auf '
-                . '<a href="https://v-t.one" target="_blank" rel="noreferrer">v-t.one</a>.</div>',
-            default => '',
-        };
-    }
 }

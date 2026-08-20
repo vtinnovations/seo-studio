@@ -2,11 +2,12 @@
 
 declare(strict_types=1);
 
-/**
- * @package   vtinnovations/seo-studio
- * @author    VT Innovations Team
- * @license   LGPL-3.0-or-later
- * @copyright VT Innovations 2026
+/*
+ * AI SEO Studio
+ *
+ * Package: vtinnovations/seo-studio
+ * Copyright: VT Innovations Team
+ * Licence: LGPL-3.0-or-later
  */
 
 namespace VTinnovations\SeoStudio\Feature\InlinePanel;
@@ -21,6 +22,8 @@ final class PanelResult
      * @param int $score 0-100
      * @param list<string> $alternatives
      * @param string $rewrite optional SEO-optimized rewrite / generated text
+     * @param list<array{label: string, ok: bool, note: string, soft: bool, fix: string}> $checks
+     *        the individual criteria behind the score — what it takes to reach 100
      */
     public function __construct(
         public readonly int $score,
@@ -28,6 +31,7 @@ final class PanelResult
         public readonly array $alternatives = [],
         public readonly bool $fromCache = false,
         public readonly string $rewrite = '',
+        public readonly array $checks = [],
     ) {
     }
 
@@ -48,6 +52,7 @@ final class PanelResult
             'reason' => $this->reason,
             'alternatives' => $this->alternatives,
             'rewrite' => $this->rewrite,
+            'checks' => $this->checks,
         ];
     }
 

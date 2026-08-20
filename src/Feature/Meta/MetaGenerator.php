@@ -2,11 +2,12 @@
 
 declare(strict_types=1);
 
-/**
- * @package   vtinnovations/seo-studio
- * @author    VT Innovations Team
- * @license   LGPL-3.0-or-later
- * @copyright VT Innovations 2026
+/*
+ * AI SEO Studio
+ *
+ * Package: vtinnovations/seo-studio
+ * Copyright: VT Innovations Team
+ * Licence: LGPL-3.0-or-later
  */
 
 namespace VTinnovations\SeoStudio\Feature\Meta;
@@ -59,17 +60,53 @@ final class MetaGenerator
         }
 
         $siteName = $this->resolveSiteName($pageId);
+        $keyword = $this->focusKeyword($pageId);
 
         $system = 'Du bist ein SEO-Experte. Du erstellst prägnante Seitentitel und Meta-Descriptions. '
             . 'Antworte ausschließlich über das Tool/JSON-Schema. Sprache der Ausgabe: ' . $content->language . '. '
             . 'Regeln: pageTitle 45-60 Zeichen, wichtigstes Thema zuerst, kein Keyword-Stuffing, keine Anführungszeichen. '
             . 'description 120-155 Zeichen, aktiver Stil, konkreter Nutzen, keine Phrasen wie "Willkommen auf".';
 
+        if ($keyword !== '') {
+            $system .= ' WICHTIG: Das vorgegebene Fokus-Keyword MUSS wörtlich im pageTitle vorkommen '
+                . '(möglichst weit vorne) und ebenso in der description — natürlich eingebaut, nicht angehängt, nicht mehrfach wiederholt.';
+        }
+
+        // Duplicate-content guard: the model must see what the other pages
+        // already claim, otherwise similar pages get near-identical meta.
+        $taken = $this->existingMeta($pageId);
+
+        $system .= ' Der Titel und die Beschreibung müssen sich DEUTLICH von den bereits vergebenen unterscheiden — '
+            . 'kein Duplicate Content. Greife auf, was diese Seite von den anderen unterscheidet.';
+
         $user = "Seite: {$content->pageTitle}\n"
             . ($siteName !== '' ? "Website: {$siteName}\n" : '')
+            . ($keyword !== '' ? "Fokus-Keyword (muss vorkommen): {$keyword}\n" : '')
             . "Gliederung:\n{$content->headingOutline()}\n\n"
-            . "Inhalt:\n{$content->truncatedPlaintext(2500)}";
+            . "Inhalt:\n{$content->truncatedPlaintext(2500)}"
+            . ($taken['titles'] !== []
+                ? "\n\nBereits von anderen Seiten belegte Titel (deiner muss anders sein):\n- " . implode("\n- ", $taken['titles'])
+                : '');
 
+        $proposal = $this->ask($system, $user);
+
+        // One corrective round if it still collides with an existing page.
+        if ($this->isTaken($proposal->pageTitle, $taken['titles']) || $this->isTaken($proposal->description, $taken['descriptions'])) {
+            $proposal = $this->ask(
+                $system,
+                $user . "\n\nDein Vorschlag „" . $proposal->pageTitle . '“ überschneidet sich mit einer anderen Seite. '
+                    . 'Formuliere Titel UND Beschreibung deutlich anders und stelle das Besondere DIESER Seite heraus.',
+            );
+        }
+
+        return $proposal;
+    }
+
+    /**
+     * @throws AiException
+     */
+    private function ask(string $system, string $user): MetaProposal
+    {
         $response = $this->ai->complete(new PromptBundle(
             systemPrompt: $system,
             userPrompt: $user,
@@ -89,6 +126,64 @@ final class MetaGenerator
             pageTitle: $this->clamp(trim($json['pageTitle']), 70),
             description: $this->clamp(trim($json['description']), 170),
         );
+    }
+
+    /**
+     * Titles/descriptions already in use on OTHER published pages.
+     *
+     * @return array{titles: list<string>, descriptions: list<string>}
+     */
+    private function existingMeta(int $pageId): array
+    {
+        try {
+            $rows = $this->connection->fetchAllAssociative(
+                "SELECT pageTitle, description FROM tl_page
+                 WHERE id != ? AND type = 'regular' AND published = '1' AND (pageTitle != '' OR description != '')
+                 ORDER BY tstamp DESC LIMIT 40",
+                [$pageId],
+            );
+        } catch (\Throwable) {
+            return ['titles' => [], 'descriptions' => []];
+        }
+
+        $titles = [];
+        $descriptions = [];
+        foreach ($rows as $row) {
+            $title = trim((string) $row['pageTitle']);
+            $description = trim((string) $row['description']);
+            if ($title !== '') {
+                $titles[] = $title;
+            }
+            if ($description !== '') {
+                $descriptions[] = $description;
+            }
+        }
+
+        return ['titles' => $titles, 'descriptions' => $descriptions];
+    }
+
+    /**
+     * @param list<string> $taken
+     */
+    private function isTaken(string $value, array $taken): bool
+    {
+        $needle = $this->normalise($value);
+        if ($needle === '') {
+            return false;
+        }
+
+        foreach ($taken as $existing) {
+            if ($this->normalise($existing) === $needle) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function normalise(string $value): string
+    {
+        return trim((string) preg_replace('/[^a-z0-9]+/u', ' ', mb_strtolower($value)));
     }
 
     /**
@@ -218,6 +313,22 @@ final class MetaGenerator
         $lastSpace = mb_strrpos($cut, ' ');
 
         return ($lastSpace !== false ? mb_substr($cut, 0, $lastSpace) : $cut) . '…';
+    }
+
+    /**
+     * The page's focus keyword (per-page SEO score feature). Returns '' when
+     * unset — or when the column does not exist because that feature was
+     * never migrated.
+     */
+    private function focusKeyword(int $pageId): string
+    {
+        try {
+            $value = $this->connection->fetchOne('SELECT seoFocusKeyword FROM tl_page WHERE id = ?', [$pageId]);
+        } catch (\Throwable) {
+            return '';
+        }
+
+        return \is_string($value) ? trim($value) : '';
     }
 
     private function resolveSiteName(int $pageId): string

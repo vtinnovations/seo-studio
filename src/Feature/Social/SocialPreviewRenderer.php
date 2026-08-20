@@ -2,11 +2,12 @@
 
 declare(strict_types=1);
 
-/**
- * @package   vtinnovations/seo-studio
- * @author    VT Innovations Team
- * @license   LGPL-3.0-or-later
- * @copyright VT Innovations 2026
+/*
+ * AI SEO Studio
+ *
+ * Package: vtinnovations/seo-studio
+ * Copyright: VT Innovations Team
+ * Licence: LGPL-3.0-or-later
  */
 
 namespace VTinnovations\SeoStudio\Feature\Social;
@@ -14,6 +15,7 @@ namespace VTinnovations\SeoStudio\Feature\Social;
 use Contao\CoreBundle\Framework\ContaoFramework;
 use Contao\PageModel;
 use Symfony\Component\HttpFoundation\RequestStack;
+use VTinnovations\SeoStudio\Core\Config\Translations;
 
 /**
  * Renders the social-media preview card shown in the tl_page edit form:
@@ -41,7 +43,7 @@ final class SocialPreviewRenderer
         $page = $pageAdapter->findByPk($pageId);
 
         if ($page === null) {
-            return '<div class="widget clr"><p class="tl_info">Seite noch nicht gespeichert.</p></div>';
+            return '<div class="widget clr"><p class="tl_info">' . $e(Translations::text('social.notSavedYet')) . '</p></div>';
         }
 
         // Pull resolved values out of the tag builder so preview == output.
@@ -67,10 +69,10 @@ final class SocialPreviewRenderer
             . $imgHtml
             . '<span class="seo-studio-socialcard-body">'
             . '<span class="seo-studio-socialcard-domain">' . $e($domain) . '</span>'
-            . '<span class="seo-studio-socialcard-title" data-role="title">' . $e($title !== '' ? $title : 'Kein Titel') . '</span>'
+            . '<span class="seo-studio-socialcard-title" data-role="title">' . $e($title !== '' ? $title : Translations::text('social.noTitle')) . '</span>'
             . '<span class="seo-studio-socialcard-desc" data-role="desc">' . $e($desc) . '</span>'
             . '</span></div>'
-            . '<p class="tl_help" style="margin-top:8px">So erscheint die Seite geteilt auf Facebook, LinkedIn &amp; X. Leere Felder greifen auf Seitentitel/Beschreibung zurück. Bild-Vorschau nach dem Speichern.</p>'
+            . '<p class="tl_help" style="margin-top:8px">' . $e(Translations::text('social.previewHint')) . '</p>'
             . '</div>';
     }
 

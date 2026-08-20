@@ -2,11 +2,12 @@
 
 declare(strict_types=1);
 
-/**
- * @package   vtinnovations/seo-studio
- * @author    VT Innovations Team
- * @license   LGPL-3.0-or-later
- * @copyright VT Innovations 2026
+/*
+ * AI SEO Studio
+ *
+ * Package: vtinnovations/seo-studio
+ * Copyright: VT Innovations Team
+ * Licence: LGPL-3.0-or-later
  */
 
 namespace VTinnovations\SeoStudio\Feature\Optimize;
@@ -16,6 +17,7 @@ use Contao\CoreBundle\DataContainer\PaletteManipulator;
 use Contao\CoreBundle\DependencyInjection\Attribute\AsHook;
 use Contao\DataContainer;
 use VTinnovations\SeoStudio\Core\Config\FeatureState;
+use VTinnovations\SeoStudio\Core\Config\Translations;
 
 /**
  * Scans the content tables and injects an "SEO optimieren" panel below every
@@ -29,13 +31,23 @@ use VTinnovations\SeoStudio\Core\Config\FeatureState;
 #[AsHook('loadDataContainer')]
 final class OptimizePanelListener
 {
-    private const TABLES = ['tl_content', 'tl_news', 'tl_calendar_events'];
+    private const TABLES = [
+        'tl_content',
+        'tl_news',
+        'tl_calendar_events',
+        // The bundle's own editorial content gets the same treatment.
+        'tl_seo_studio_faq',
+        'tl_seo_studio_glossary',
+    ];
 
     /** Field NAMES treated as a headline regardless of inputType. */
-    private const HEADLINE_NAMES = ['headline', 'subheadline', 'title', 'subtitle', 'ueberschrift'];
+    private const HEADLINE_NAMES = ['headline', 'subheadline', 'title', 'subtitle', 'ueberschrift', 'question', 'term'];
 
-    /** Field names to never touch (aliases, internal). */
-    private const SKIP_NAMES = ['alias', 'cssID', 'guests', 'jumpTo'];
+    /**
+     * Field names to never touch: aliases, internal plumbing, and the meta
+     * fields that already have their own dedicated AI panel.
+     */
+    private const SKIP_NAMES = ['alias', 'cssID', 'guests', 'jumpTo', 'metaTitle', 'metaDescription'];
 
     public function __construct(
         private readonly FeatureState $featureState,
@@ -109,7 +121,7 @@ final class OptimizePanelListener
         $GLOBALS['TL_CSS']['seo_studio'] = 'bundles/vtinnovationsseostudio/backend.css';
 
         $e = static fn (string $v): string => htmlspecialchars($v, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-        $label = $fieldType === 'headline' ? 'Überschrift' : 'Text';
+        $label = $fieldType === 'headline' ? Translations::text('optimize.headline') : Translations::text('optimize.text');
 
         return '<div class="widget clr seo-studio-panel seo-studio-optimize" data-seo-studio-optimize'
             . ' data-table="' . $e($table) . '"'
@@ -120,15 +132,17 @@ final class OptimizePanelListener
             . ' data-token="' . $e($this->csrfTokenManager->getDefaultTokenValue()) . '"'
             . ' data-url="/contao/seostudio/optimize">'
             . '<p><button type="button" class="tl_submit seo-studio-opt-check">SEO-Check (' . $e($label) . ')</button> '
-            . '<button type="button" class="tl_submit seo-studio-opt-rewrite">Mit KI optimieren</button> '
+            . '<button type="button" class="tl_submit seo-studio-opt-rewrite">' . $e(Translations::text('optimize.rewriteButton')) . '</button> '
             . '<span class="seo-studio-verdict"></span> '
             . '<span class="seo-studio-status" aria-live="polite"></span></p>'
             . '<div class="seo-studio-result" hidden>'
             . '<p class="seo-studio-reason"></p>'
+            // The measured criteria — makes visible what 100/100 requires.
+            . '<ul class="seo-studio-checklist seo-studio-optchecks"></ul>'
             . '<div class="seo-studio-rewrite-box" hidden>'
             . '<p class="seo-studio-muted">Vorschlag:</p>'
             . '<div class="seo-studio-note seo-studio-rewrite-preview"></div>'
-            . '<p><button type="button" class="tl_submit seo-studio-opt-apply">In Feld übernehmen</button> '
+            . '<p><button type="button" class="tl_submit seo-studio-opt-apply">' . $e(Translations::text('optimize.applyButton')) . '</button> '
             . '<button type="button" class="tl_submit seo-studio-opt-discard">Verwerfen</button></p>'
             . '</div>'
             . '<ul class="seo-studio-alternatives"></ul>'

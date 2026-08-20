@@ -2,11 +2,12 @@
 
 declare(strict_types=1);
 
-/**
- * @package   vtinnovations/seo-studio
- * @author    VT Innovations Team
- * @license   LGPL-3.0-or-later
- * @copyright VT Innovations 2026
+/*
+ * AI SEO Studio
+ *
+ * Package: vtinnovations/seo-studio
+ * Copyright: VT Innovations Team
+ * Licence: LGPL-3.0-or-later
  */
 
 namespace VTinnovations\SeoStudio\Feature\InlinePanel;
@@ -68,7 +69,7 @@ final class ContextResolver
         $rows = $this->connection->fetchFirstColumn(
             "SELECT c.headline FROM tl_content c
              JOIN tl_article a ON a.id = c.pid AND c.ptable IN ('', 'tl_article')
-             WHERE a.pid = ? AND c.id != ? AND c.invisible = '' AND c.headline != ''
+             WHERE a.pid = ? AND a.published = '1' AND c.id != ? AND c.invisible = '' AND c.headline != ''
              ORDER BY a.sorting, c.sorting",
             [$pageId, $contentId],
         );

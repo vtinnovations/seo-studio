@@ -2,17 +2,19 @@
 
 declare(strict_types=1);
 
-/**
- * @package   vtinnovations/seo-studio
- * @author    VT Innovations Team
- * @license   LGPL-3.0-or-later
- * @copyright VT Innovations 2026
+/*
+ * AI SEO Studio
+ *
+ * Package: vtinnovations/seo-studio
+ * Copyright: VT Innovations Team
+ * Licence: LGPL-3.0-or-later
  */
 
 namespace VTinnovations\SeoStudio\Feature\Audit;
 
 use VTinnovations\SeoStudio\Core\Ai\AiGateway;
 use VTinnovations\SeoStudio\Core\Ai\PromptBundle;
+use VTinnovations\SeoStudio\Core\Config\Translations;
 use VTinnovations\SeoStudio\Core\Content\ContentExtractor;
 use VTinnovations\SeoStudio\Feature\InlinePanel\PanelResult;
 use VTinnovations\SeoStudio\Feature\InlinePanel\VerdictCache;
@@ -54,7 +56,7 @@ final class AnswerFirstChecker
         $content = $this->extractor->forPage($pageId);
 
         if ($content->firstParagraph === '') {
-            return new PanelResult(0, 'Kein Einstiegsabsatz gefunden — die Seite braucht einen Textabsatz am Anfang.', []);
+            return new PanelResult(0, Translations::text('audit.noIntroParagraph'), []);
         }
 
         $cacheKey = $this->cache->key('answerFirst', $content->pageTitle, $content->firstParagraph);

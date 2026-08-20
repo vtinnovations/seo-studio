@@ -2,11 +2,12 @@
 
 declare(strict_types=1);
 
-/**
- * @package   vtinnovations/seo-studio
- * @author    VT Innovations Team
- * @license   LGPL-3.0-or-later
- * @copyright VT Innovations 2026
+/*
+ * AI SEO Studio
+ *
+ * Package: vtinnovations/seo-studio
+ * Copyright: VT Innovations Team
+ * Licence: LGPL-3.0-or-later
  */
 
 namespace VTinnovations\SeoStudio\Feature\Freshness;
@@ -15,6 +16,7 @@ use Contao\CoreBundle\Event\ContaoCoreEvents;
 use Contao\CoreBundle\Event\SitemapEvent;
 use Doctrine\DBAL\Connection;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
+use VTinnovations\SeoStudio\Core\Config\EntitlementEvaluator;
 use VTinnovations\SeoStudio\Core\Config\FeatureState;
 
 /**
@@ -31,11 +33,16 @@ final class SitemapLastmodListener
     public function __construct(
         private readonly FeatureState $featureState,
         private readonly Connection $connection,
+        private readonly EntitlementEvaluator $entitlement,
     ) {
     }
 
     public function __invoke(SitemapEvent $event): void
     {
+        if (!$this->entitlement->isLicensed()) {
+            return;
+        }
+
         if (!$this->featureState->isEnabled('freshness')) {
             return;
         }

@@ -1,3 +1,11 @@
+/*
+ * AI SEO Studio
+ *
+ * Package: vtinnovations/seo-studio
+ * Copyright: VT Innovations Team
+ * Licence: LGPL-3.0-or-later
+ */
+
 /* SEO Studio — per-page checklist 1-click AI fixes (keyword + meta). */
 (function () {
     'use strict';

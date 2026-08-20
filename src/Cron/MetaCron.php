@@ -2,11 +2,12 @@
 
 declare(strict_types=1);
 
-/**
- * @package   vtinnovations/seo-studio
- * @author    VT Innovations Team
- * @license   LGPL-3.0-or-later
- * @copyright VT Innovations 2026
+/*
+ * AI SEO Studio
+ *
+ * Package: vtinnovations/seo-studio
+ * Copyright: VT Innovations Team
+ * Licence: LGPL-3.0-or-later
  */
 
 namespace VTinnovations\SeoStudio\Cron;
@@ -15,6 +16,7 @@ use Contao\CoreBundle\DependencyInjection\Attribute\AsCronJob;
 use Doctrine\DBAL\Connection;
 use Psr\Log\LoggerInterface;
 use VTinnovations\SeoStudio\Core\Config\ConfigProvider;
+use VTinnovations\SeoStudio\Core\Config\EntitlementEvaluator;
 use VTinnovations\SeoStudio\Core\Config\FeatureState;
 use VTinnovations\SeoStudio\Core\Job\JobLock;
 use VTinnovations\SeoStudio\Core\Security\BudgetExceededException;
@@ -36,11 +38,19 @@ final class MetaCron
         private readonly MetaGenerator $generator,
         private readonly JobLock $lock,
         private readonly LoggerInterface $logger,
+        private readonly EntitlementEvaluator $entitlement,
     ) {
     }
 
     public function __invoke(): void
     {
+        // Background work is gated independently of any request-scoped check:
+        // the cron runs without a session, so it must decide for itself. The
+        // evaluation uses the persisted verified host, not a Host header.
+        if (!$this->entitlement->isLicensed()) {
+            return;
+        }
+
         if (!$this->featureState->isEnabled('meta') || !(bool) $this->config->get('metaCronEnabled', false)) {
             return;
         }

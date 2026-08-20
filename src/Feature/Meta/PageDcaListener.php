@@ -2,11 +2,12 @@
 
 declare(strict_types=1);
 
-/**
- * @package   vtinnovations/seo-studio
- * @author    VT Innovations Team
- * @license   LGPL-3.0-or-later
- * @copyright VT Innovations 2026
+/*
+ * AI SEO Studio
+ *
+ * Package: vtinnovations/seo-studio
+ * Copyright: VT Innovations Team
+ * Licence: LGPL-3.0-or-later
  */
 
 namespace VTinnovations\SeoStudio\Feature\Meta;
@@ -16,6 +17,7 @@ use Contao\CoreBundle\DataContainer\PaletteManipulator;
 use Contao\CoreBundle\DependencyInjection\Attribute\AsHook;
 use Contao\DataContainer;
 use VTinnovations\SeoStudio\Core\Config\FeatureState;
+use VTinnovations\SeoStudio\Core\Config\Translations;
 
 /**
  * Injects the "Mit KI generieren" panel into tl_page, right after the
@@ -70,27 +72,28 @@ final class PageDcaListener
     {
         $token = $this->csrfTokenManager->getDefaultTokenValue();
         $pageId = (int) $dc->id;
+        $e = static fn (string $v): string => htmlspecialchars($v, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 
         $GLOBALS['TL_JAVASCRIPT']['seo_studio_meta'] = 'bundles/vtinnovationsseostudio/meta-panel.js';
         $GLOBALS['TL_CSS']['seo_studio'] = 'bundles/vtinnovationsseostudio/backend.css';
 
         $metaSection = '';
         if ($this->featureState->isEnabled('meta')) {
-            $metaSection = '<p><button type="button" class="tl_submit seo-studio-generate">Titel &amp; Beschreibung mit KI vorschlagen</button>'
+            $metaSection = '<p><button type="button" class="tl_submit seo-studio-generate">' . $e(Translations::text('meta.proposeButton')) . '</button>'
                 . ' <span class="seo-studio-status" aria-live="polite"></span></p>'
                 . '<div class="seo-studio-result" hidden>'
-                . '<p class="seo-studio-proposal"><strong>Titel:</strong> <span data-role="pageTitle"></span> <em data-role="pageTitleLen"></em></p>'
-                . '<p class="seo-studio-proposal"><strong>Beschreibung:</strong> <span data-role="description"></span> <em data-role="descriptionLen"></em></p>'
-                . '<p><button type="button" class="tl_submit seo-studio-apply">In Felder übernehmen</button> '
+                . '<p class="seo-studio-proposal"><strong>' . $e(Translations::text('meta.titleLabel')) . ':</strong> <span data-role="pageTitle"></span> <em data-role="pageTitleLen"></em></p>'
+                . '<p class="seo-studio-proposal"><strong>' . $e(Translations::text('meta.descriptionLabel')) . ':</strong> <span data-role="description"></span> <em data-role="descriptionLen"></em></p>'
+                . '<p><button type="button" class="tl_submit seo-studio-apply">' . $e(Translations::text('meta.applyButton')) . '</button> '
                 . '<button type="button" class="tl_submit seo-studio-discard">Verwerfen</button></p>'
-                . '<p class="tl_help">Übernahme füllt nur die Formularfelder — gespeichert wird erst mit „Speichern“.</p>'
+                . '<p class="tl_help">' . $e(Translations::text('meta.applyHint')) . '</p>'
                 . '</div>';
         }
 
         $faqSection = '';
         if ($this->featureState->isEnabled('faq')) {
             $faqSection = '<p class="seo-studio-faq-row">'
-                . '<button type="button" class="tl_submit seo-studio-faq-generate" data-url="/contao/seostudio/faq/generate">FAQ-Entwürfe mit KI erstellen</button> '
+                . '<button type="button" class="tl_submit seo-studio-faq-generate" data-url="/contao/seostudio/faq/generate">' . $e(Translations::text('faq.generateButton')) . '</button> '
                 . '<select class="tl_select seo-studio-faq-count" style="width:auto;display:inline-block">'
                 . '<option value="3">3 Fragen</option><option value="5" selected>5 Fragen</option><option value="8">8 Fragen</option>'
                 . '</select> '

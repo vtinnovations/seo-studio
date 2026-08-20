@@ -2,11 +2,12 @@
 
 declare(strict_types=1);
 
-/**
- * @package   vtinnovations/seo-studio
- * @author    VT Innovations Team
- * @license   LGPL-3.0-or-later
- * @copyright VT Innovations 2026
+/*
+ * AI SEO Studio
+ *
+ * Package: vtinnovations/seo-studio
+ * Copyright: VT Innovations Team
+ * Licence: LGPL-3.0-or-later
  */
 
 namespace VTinnovations\SeoStudio\Core\Ai\Provider;
@@ -15,6 +16,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 use VTinnovations\SeoStudio\Core\Ai\AiClientInterface;
 use VTinnovations\SeoStudio\Core\Ai\AiException;
 use VTinnovations\SeoStudio\Core\Ai\AiExceptionKind;
+use VTinnovations\SeoStudio\Core\Config\Translations;
 use VTinnovations\SeoStudio\Core\Security\SecretStore;
 use VTinnovations\SeoStudio\Core\Config\ConfigProvider;
 
@@ -44,7 +46,7 @@ abstract class AbstractHttpClient implements AiClientInterface
     {
         if ($this->config->externalCallsBlocked()) {
             throw new AiException(
-                'Externe Aufrufe sind deaktiviert ("Keine externen Aufrufe"). Bitte erst in den Einstellungen freigeben.',
+                Translations::text('error.egressBlocked'),
                 AiExceptionKind::EgressBlocked,
             );
         }
@@ -58,7 +60,7 @@ abstract class AbstractHttpClient implements AiClientInterface
         $key = $this->secretStore->get(self::SECRET_NAME);
         if ($key === null || $key === '') {
             throw new AiException(
-                'Kein API-Schluessel hinterlegt. Bitte in den Einstellungen setzen.',
+                Translations::text('error.apiKeyMissing'),
                 AiExceptionKind::Auth,
             );
         }
@@ -86,7 +88,7 @@ abstract class AbstractHttpClient implements AiClientInterface
 
         if (!\in_array($scheme, ['http', 'https'], true) || $host === '') {
             throw new AiException(
-                'Ungueltige Basis-URL. Nur http(s) mit Hostname erlaubt.',
+                Translations::text('error.invalidBaseUrl'),
                 AiExceptionKind::BadRequest,
             );
         }

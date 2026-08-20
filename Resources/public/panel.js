@@ -1,3 +1,11 @@
+/*
+ * AI SEO Studio
+ *
+ * Package: vtinnovations/seo-studio
+ * Copyright: VT Innovations Team
+ * Licence: LGPL-3.0-or-later
+ */
+
 /* SEO Studio — generic inline suggestion panel (headline/alt/teaser/linkText). */
 (function () {
     'use strict';

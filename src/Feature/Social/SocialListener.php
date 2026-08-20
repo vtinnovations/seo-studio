@@ -2,11 +2,12 @@
 
 declare(strict_types=1);
 
-/**
- * @package   vtinnovations/seo-studio
- * @author    VT Innovations Team
- * @license   LGPL-3.0-or-later
- * @copyright VT Innovations 2026
+/*
+ * AI SEO Studio
+ *
+ * Package: vtinnovations/seo-studio
+ * Copyright: VT Innovations Team
+ * Licence: LGPL-3.0-or-later
  */
 
 namespace VTinnovations\SeoStudio\Feature\Social;
@@ -15,6 +16,7 @@ use Contao\CoreBundle\Routing\ScopeMatcher;
 use Contao\PageModel;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpKernel\Event\ResponseEvent;
+use VTinnovations\SeoStudio\Core\Config\EntitlementEvaluator;
 use VTinnovations\SeoStudio\Core\Config\FeatureState;
 
 /**
@@ -32,12 +34,17 @@ final class SocialListener
         private readonly FeatureState $featureState,
         private readonly ScopeMatcher $scopeMatcher,
         private readonly SocialTagBuilder $builder,
+        private readonly EntitlementEvaluator $entitlement,
     ) {
     }
 
     public function __invoke(ResponseEvent $event): void
     {
         if (!$event->isMainRequest() || !$this->scopeMatcher->isFrontendRequest($event->getRequest())) {
+            return;
+        }
+
+        if (!$this->entitlement->isLicensed()) {
             return;
         }
 

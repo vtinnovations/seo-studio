@@ -2,14 +2,17 @@
 
 declare(strict_types=1);
 
-/**
- * @package   vtinnovations/seo-studio
- * @author    VT Innovations Team
- * @license   LGPL-3.0-or-later
- * @copyright VT Innovations 2026
+/*
+ * AI SEO Studio
+ *
+ * Package: vtinnovations/seo-studio
+ * Copyright: VT Innovations Team
+ * Licence: LGPL-3.0-or-later
  */
 
 namespace VTinnovations\SeoStudio\Controller;
+
+use VTinnovations\SeoStudio\Core\Config\Translations;
 
 /**
  * Shared tab-container markup for the SEO Studio backend modules. Pairs with
@@ -18,6 +21,27 @@ namespace VTinnovations\SeoStudio\Controller;
  */
 trait BackendTabsTrait
 {
+    /**
+     * Translation lookup for the hand-built backend screens.
+     *
+     * Dotted keys resolve inside $GLOBALS['TL_LANG']['SEO_STUDIO'], i.e. in
+     * contao/languages/<lang>/default.php. There is no inline fallback on
+     * purpose — see Translations.
+     */
+    protected function trans(string $key): string
+    {
+        return Translations::text($key);
+    }
+
+    /**
+     * Same lookup with sprintf arguments, for counted strings such as
+     * "%d of %d pages".
+     */
+    protected function transf(string $key, mixed ...$args): string
+    {
+        return Translations::text($key, ...$args);
+    }
+
     /**
      * Wraps the given tabs in a tab container. Each tab is [id, label, body];
      * empty bodies are skipped. Returns the body verbatim when only one tab
@@ -78,33 +102,47 @@ trait BackendTabsTrait
 
         return '<div id="tl_buttons"></div>'
             . \Contao\Message::generate()
-            . '<div class="seo-studio-shell">' . $this->licenseBanner() . $hero . $body . '</div>';
+            . '<div class="seo-studio-shell">' . $hero . $body . '</div>';
     }
 
     /**
-     * A licence-state strip shown above every module: demo countdown or an
-     * expiry lock-out prompt. Nothing when fully licensed.
+     * Module-entry gate for every SEO Studio backend module.
+     *
+     * Two jobs, in this order:
+     *   1. entering a protected module is the trigger for the once-per-backend-
+     *      session usage signal, so the claim is made here (delivery happens
+     *      after the response and can never delay rendering);
+     *   2. without a valid licence the module renders nothing but a pointer to
+     *      Contao → Settings.
+     *
+     * The menu group is not even registered while unlicensed; this is the second,
+     * independent gate for the case where that registration is bypassed.
+     *
+     * Returns null when the module may render normally.
      */
-    protected function licenseBanner(): string
+    protected function entitlementNotice(): ?string
     {
-        $guard = \Contao\System::getContainer()->get(\VTinnovations\SeoStudio\Core\Security\LicenseGuard::class);
-        if (!$guard instanceof \VTinnovations\SeoStudio\Core\Security\LicenseGuard) {
-            return '';
+        $container = \Contao\System::getContainer();
+
+        /** @var \VTinnovations\SeoStudio\Exchange\EntryClaim $entryClaim */
+        $entryClaim = $container->get(\VTinnovations\SeoStudio\Exchange\EntryClaim::class);
+        $entryClaim->claim();
+
+        /** @var \VTinnovations\SeoStudio\Core\Config\EntitlementEvaluator $entitlement */
+        $entitlement = $container->get(\VTinnovations\SeoStudio\Core\Config\EntitlementEvaluator::class);
+
+        if ($entitlement->isLicensed()) {
+            return null;
         }
 
-        $settingsUrl = '<a href="' . \htmlspecialchars($this->seoStudioModuleUrl('seo_settings'), ENT_QUOTES) . '">Einstellungen → Lizenz</a>';
+        $e = static fn (string $value): string => htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 
-        return match ($guard->state()) {
-            \VTinnovations\SeoStudio\Core\Security\LicenseGuard::STATE_DEMO => '<div class="seo-studio-license seo-studio-license--demo">'
-                . '<strong>Demo-Lizenz</strong> — noch ' . $guard->demoDaysLeft() . ' Tag(e). '
-                . 'Einige Funktionen sind gesperrt. Vollversion schaltet alles frei: '
-                . '<a href="https://v-t.one" target="_blank" rel="noreferrer">v-t.one</a>.</div>',
-            \VTinnovations\SeoStudio\Core\Security\LicenseGuard::STATE_UNLICENSED => '<div class="seo-studio-license seo-studio-license--expired">'
-                . '<strong>Keine gültige Lizenz.</strong> Trage deinen Lizenzschlüssel ein (' . $settingsUrl . ') — '
-                . 'auch die Demo benötigt einen Schlüssel. Kostenlose Demo &amp; Vollversion auf '
-                . '<a href="https://v-t.one" target="_blank" rel="noreferrer">v-t.one</a>.</div>',
-            default => '',
-        };
+        return '<div id="tl_buttons"></div>' . \Contao\Message::generate()
+            . '<div class="tl_gerror">'
+            . $e($this->trans('licence.moduleBlocked'))
+            . ' <a href="' . $e($this->seoStudioModuleUrl('settings')) . '">'
+            . $e($this->trans('licence.openSettings'))
+            . '</a></div>';
     }
 
     private function seoStudioModuleUrl(string $module): string
@@ -128,7 +166,7 @@ trait BackendTabsTrait
             return '';
         }
 
-        $options = '<option value="0">' . $e('Alle Startpunkte') . '</option>';
+        $options = '<option value="0">' . $e($this->trans('dash.allRoots')) . '</option>';
         foreach ($roots as $root) {
             $sel = $root['id'] === $rootId ? ' selected' : '';
             $options .= '<option value="' . $root['id'] . '"' . $sel . '>' . $e($root['title']) . '</option>';
@@ -136,7 +174,7 @@ trait BackendTabsTrait
 
         return '<form method="get" class="seo-studio-rootfilter">'
             . '<input type="hidden" name="do" value="' . $e($module) . '">'
-            . '<label>' . $e('Startpunkt') . ': '
+            . '<label>' . $e($this->trans('dash.root')) . ': '
             . '<select name="root" class="tl_select" onchange="this.form.submit()">' . $options . '</select></label>'
             . '</form>';
     }

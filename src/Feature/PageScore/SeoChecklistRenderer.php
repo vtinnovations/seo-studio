@@ -2,16 +2,18 @@
 
 declare(strict_types=1);
 
-/**
- * @package   vtinnovations/seo-studio
- * @author    VT Innovations Team
- * @license   LGPL-3.0-or-later
- * @copyright VT Innovations 2026
+/*
+ * AI SEO Studio
+ *
+ * Package: vtinnovations/seo-studio
+ * Copyright: VT Innovations Team
+ * Licence: LGPL-3.0-or-later
  */
 
 namespace VTinnovations\SeoStudio\Feature\PageScore;
 
 use Contao\CoreBundle\Csrf\ContaoCsrfTokenManager;
+use VTinnovations\SeoStudio\Core\Config\Translations;
 
 /**
  * Renders the per-page SEO checklist panel shown in the tl_page edit form:
@@ -42,16 +44,16 @@ final class SeoChecklistRenderer
         try {
             $report = $this->analyzer->analyze($pageId);
         } catch (\Throwable $ex) {
-            return '<div class="widget clr"><p class="tl_info">SEO-Analyse nicht möglich: ' . $e($ex->getMessage()) . '</p></div>';
+            return '<div class="widget clr"><p class="tl_info">' . $e(Translations::text('score.analysisFailed')) . $e($ex->getMessage()) . '</p></div>';
         }
 
         if ($report->checks === []) {
-            return '<div class="widget clr"><p class="tl_info">Noch kein analysierbarer Inhalt auf dieser Seite.</p></div>';
+            return '<div class="widget clr"><p class="tl_info">' . $e(Translations::text('score.noContent')) . '</p></div>';
         }
 
         $summary = $report->problemCount() > 0
             ? $report->problemCount() . ' Problem(e)' . ($report->warningCount() > 0 ? ', ' . $report->warningCount() . ' Hinweis(e)' : '')
-            : ($report->warningCount() > 0 ? $report->warningCount() . ' Hinweis(e)' : 'alles im grünen Bereich');
+            : ($report->warningCount() > 0 ? Translations::text('score.warningCount', $report->warningCount()) : Translations::text('score.allGood'));
 
         $token = $this->csrfTokenManager->getDefaultTokenValue();
 
@@ -62,19 +64,19 @@ final class SeoChecklistRenderer
             . ' data-meta-url="/contao/seostudio/meta/generate">'
             . '<div class="seo-studio-score-head">'
             . '<span class="seo-studio-scoreball seo-studio-scoreball--' . $report->color() . '">' . $report->score . '</span>'
-            . '<div><strong>SEO-Bewertung dieser Seite</strong>'
+            . '<div><strong>' . $e(Translations::text('score.panelTitle')) . '</strong>'
             . '<div class="seo-studio-muted">' . $e($summary) . ' · Stand: nach dem letzten Speichern</div></div>'
             . '</div>';
 
         // 1-click AI actions.
         $html .= '<div class="seo-studio-pf-actions">'
-            . '<button type="button" class="tl_submit seo-studio-pf-keyword">KI: Fokus-Keyword vorschlagen</button> '
-            . '<button type="button" class="tl_submit seo-studio-pf-meta">KI: Titel &amp; Beschreibung erzeugen</button> '
+            . '<button type="button" class="tl_submit seo-studio-pf-keyword">' . $e(Translations::text('score.suggestKeyword')) . '</button> '
+            . '<button type="button" class="tl_submit seo-studio-pf-meta">' . $e(Translations::text('score.generateMeta')) . '</button> '
             . '<span class="seo-studio-pf-status seo-studio-muted"></span>'
             . '</div>';
 
         if ($report->focusKeyword === '') {
-            $html .= '<p class="tl_info" style="margin:8px 0">Tipp: Trage oben ein <strong>Fokus-Keyword</strong> ein (oder lass es dir per KI vorschlagen) — dann prüft SEO Studio zusätzlich, ob es an den richtigen Stellen vorkommt.</p>';
+            $html .= '<p class="tl_info" style="margin:8px 0">' . Translations::text('score.keywordTip') . '</p>';
         }
 
         // Group the checks.
@@ -120,8 +122,8 @@ final class SeoChecklistRenderer
         }
 
         return match ($check->fix) {
-            'meta' => ' <button type="button" class="seo-studio-pf-link seo-studio-pf-meta">mit KI beheben</button>',
-            'keyword' => ' <button type="button" class="seo-studio-pf-link seo-studio-pf-keyword">KI-Vorschlag</button>',
+            'meta' => ' <button type="button" class="seo-studio-pf-link seo-studio-pf-meta">' . Translations::text('score.fixWithAi') . '</button>',
+            'keyword' => ' <button type="button" class="seo-studio-pf-link seo-studio-pf-keyword">' . Translations::text('score.aiSuggestion') . '</button>',
             default => '',
         };
     }

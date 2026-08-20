@@ -26,7 +26,6 @@ services:
             - '../src/Core/Ai/AiExceptionKind.php'       # enum
             - '../src/Core/Ai/TestResult.php'            # value object
             - '../src/Core/Config/FeatureInterface.php'  # interface
-            - '../src/Core/Config/LicenseTier.php'       # enum
             - '../src/Core/Security/BudgetExceededException.php'
             - '../src/Core/Content/ExtractedContent.php' # value object
             - '../src/Core/Content/HeadingNode.php'      # value object
@@ -37,7 +36,17 @@ services:
             - '../src/Feature/InlinePanel/AdapterInterface.php' # interface
             - '../src/Feature/PageScore/SeoCheck.php'           # value object
             - '../src/Feature/PageScore/SeoReport.php'          # value object
-            - '../src/Core/Security/LicensePaths.php'           # scalar arg, defined below
+            - '../src/Core/Config/EntitlementState.php'         # value object
+            - '../src/Core/Config/ProvisioningRecord.php'       # value object
+            - '../src/Core/Config/PackagePolicy.php'            # constants
+            - '../src/Core/Config/InstanceStatePanel.php'       # Contao widget (new'ed by Contao)
+            - '../src/Core/Content/HostName.php'                # static helper
+            - '../src/Core/Security/CanonicalForm.php'          # static helper
+            - '../src/Core/Security/TrustAnchor.php'            # value object
+            - '../src/Exchange/Endpoint.php'                    # constants
+            - '../src/Exchange/AcceptanceResult.php'            # value object
+            - '../src/Exchange/VerifyOutcome.php'               # value object
+            - '../src/Exchange/InboundRequest.php'              # value object
 
     # ── Config + secrets ────────────────────────────────────────────────
     VTinnovations\SeoStudio\Core\Config\ConfigProvider:
@@ -47,21 +56,6 @@ services:
         arguments:
             $projectDir: '%kernel.project_dir%'
         public: true   # fetched by BE_MOD callbacks via the container
-
-    # ── Licensing (paid product + 3-day demo) ───────────────────────────
-    VTinnovations\SeoStudio\Core\Security\LicensePaths:
-        arguments:
-            $projectDir: '%kernel.project_dir%'
-
-    VTinnovations\SeoStudio\Core\Security\LicenseVerifier:
-        arguments:
-            $client: '@http_client'
-
-    VTinnovations\SeoStudio\Core\Security\LicenseManager:
-        public: true   # fetched by BE_MOD callbacks via the container
-
-    VTinnovations\SeoStudio\Core\Security\LicenseGuard:
-        public: true   # fetched by BE_MOD callbacks + the shell/banner
 
     VTinnovations\SeoStudio\Core\Config\FeatureRegistry:
         arguments:
@@ -73,6 +67,41 @@ services:
 
     VTinnovations\SeoStudio\Core\Content\RootScope:
         public: true   # fetched by the dashboard + analysis BE_MOD callbacks
+
+    # ── Provisioning: host identity, trust, state, entitlement ─────────
+    VTinnovations\SeoStudio\Core\Content\SiteInventory:
+        public: true   # fetched by the Settings licence widget
+
+    VTinnovations\SeoStudio\Core\Content\HostInventory: '@VTinnovations\SeoStudio\Core\Content\SiteInventory'
+
+    VTinnovations\SeoStudio\Core\Config\ProvisioningStore:
+        arguments:
+            $projectDir: '%kernel.project_dir%'
+
+    VTinnovations\SeoStudio\Core\Config\EntitlementEvaluator:
+        public: true   # fetched by contao/config/config.php and BE_MOD callbacks
+
+    VTinnovations\SeoStudio\Core\Config\InstanceSettingsListener:
+        arguments:
+            $csrfTokenName: '%contao.csrf_token_name%'
+
+    VTinnovations\SeoStudio\Exchange\VerifyClient:
+        arguments:
+            $httpClient: '@http_client'
+
+    VTinnovations\SeoStudio\Exchange\SignalTransport:
+        arguments:
+            $httpClient: '@http_client'
+
+    VTinnovations\SeoStudio\Exchange\EntryClaim:
+        public: true   # fetched by the Settings licence widget and BE_MOD callbacks
+
+    VTinnovations\SeoStudio\Exchange\ProvisioningWorkflow:
+        public: true   # fetched by the Settings onsubmit callback path
+
+    VTinnovations\SeoStudio\Controller\ExchangeCallbackController:
+        public: true
+        tags: ['controller.service_arguments']
 
     VTinnovations\SeoStudio\Core\Security\TokenBudget:
         public: true
@@ -175,6 +204,10 @@ services:
         tags: ['controller.service_arguments']
 
     VTinnovations\SeoStudio\Controller\PageFixController:
+        public: true
+        tags: ['controller.service_arguments']
+
+    VTinnovations\SeoStudio\Controller\ListScoreController:
         public: true
         tags: ['controller.service_arguments']
 

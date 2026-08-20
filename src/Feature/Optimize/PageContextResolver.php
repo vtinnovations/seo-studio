@@ -2,11 +2,12 @@
 
 declare(strict_types=1);
 
-/**
- * @package   vtinnovations/seo-studio
- * @author    VT Innovations Team
- * @license   LGPL-3.0-or-later
- * @copyright VT Innovations 2026
+/*
+ * AI SEO Studio
+ *
+ * Package: vtinnovations/seo-studio
+ * Copyright: VT Innovations Team
+ * Licence: LGPL-3.0-or-later
  */
 
 namespace VTinnovations\SeoStudio\Feature\Optimize;
@@ -37,6 +38,7 @@ final class PageContextResolver
      *     siteName: string,
      *     language: string,
      *     plaintext: string,
+     *     focusKeyword: string,
      *     siblingHeadlines: list<string>
      * }
      */
@@ -52,6 +54,7 @@ final class PageContextResolver
                 'siteName' => $this->siteName($pageId),
                 'language' => $extracted->language,
                 'plaintext' => $extracted->truncatedPlaintext(2500),
+                'focusKeyword' => $this->focusKeyword($pageId),
                 'siblingHeadlines' => array_map(
                     static fn ($h): string => $h->text,
                     $extracted->headings,
@@ -67,8 +70,24 @@ final class PageContextResolver
             'siteName' => $this->firstRootTitle(),
             'language' => $language,
             'plaintext' => $body,
+            'focusKeyword' => '',
             'siblingHeadlines' => [],
         ];
+    }
+
+    /**
+     * The page's focus keyword (per-page SEO score feature); '' when unset or
+     * when that feature was never migrated.
+     */
+    private function focusKeyword(int $pageId): string
+    {
+        try {
+            $value = $this->connection->fetchOne('SELECT seoFocusKeyword FROM tl_page WHERE id = ?', [$pageId]);
+        } catch (\Throwable) {
+            return '';
+        }
+
+        return \is_string($value) ? trim($value) : '';
     }
 
     /**
@@ -76,6 +95,13 @@ final class PageContextResolver
      */
     private function pageIdFor(string $table, int $rowId): ?int
     {
+        // A FAQ entry belongs to a page — reuse that page's full context.
+        if ($table === 'tl_seo_studio_faq') {
+            $pid = $this->connection->fetchOne('SELECT pid FROM tl_seo_studio_faq WHERE id = ?', [$rowId]);
+
+            return $pid !== false && (int) $pid > 0 ? (int) $pid : null;
+        }
+
         if ($table !== 'tl_content') {
             return null;
         }
@@ -99,6 +125,20 @@ final class PageContextResolver
      */
     private function entryContext(string $table, int $rowId): array
     {
+        // Glossary entries have no page — the term and its definition ARE the context.
+        if ($table === 'tl_seo_studio_glossary') {
+            $row = $this->connection->fetchAssociative(
+                'SELECT term, definition FROM tl_seo_studio_glossary WHERE id = ?',
+                [$rowId],
+            );
+
+            return [
+                \is_array($row) ? trim((string) $row['term']) : '',
+                \is_array($row) ? mb_substr(trim(strip_tags((string) $row['definition'])), 0, 3000) : '',
+                $this->firstRootLanguage(),
+            ];
+        }
+
         if (!\in_array($table, ['tl_news', 'tl_calendar_events'], true)) {
             return ['', '', $this->firstRootLanguage()];
         }

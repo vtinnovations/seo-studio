@@ -2,11 +2,12 @@
 
 declare(strict_types=1);
 
-/**
- * @package   vtinnovations/seo-studio
- * @author    VT Innovations Team
- * @license   LGPL-3.0-or-later
- * @copyright VT Innovations 2026
+/*
+ * AI SEO Studio
+ *
+ * Package: vtinnovations/seo-studio
+ * Copyright: VT Innovations Team
+ * Licence: LGPL-3.0-or-later
  */
 
 namespace VTinnovations\SeoStudio\Feature\Optimize;
@@ -16,36 +17,26 @@ use VTinnovations\SeoStudio\Core\Ai\AiExceptionKind;
 use VTinnovations\SeoStudio\Core\Ai\AiGateway;
 use VTinnovations\SeoStudio\Core\Ai\PromptBundle;
 use VTinnovations\SeoStudio\Feature\InlinePanel\PanelResult;
-use VTinnovations\SeoStudio\Feature\InlinePanel\VerdictCache;
 
 /**
  * Global SEO optimizer for headline and text fields.
  *
- * Three modes, one LLM call each:
- *   - score:    rate the current value (0-100 + reason + alternatives)
- *   - rewrite:  SEO-optimize the existing value, keeping its meaning
- *   - generate: field is empty → write it from the page's real content
+ * DIVISION OF LABOUR: {@see FieldScorer} measures (deterministic PHP), the LLM
+ * only writes. A model never grades its own output, so the score is stable and
+ * — because no two criteria contradict each other — 100/100 is genuinely
+ * reachable.
  *
- * fieldType headline (short, punchy, answer-first) vs text (flowing HTML
- * paragraphs). The page context (plaintext, page/site name, sibling
- * headlines) grounds both rewrite and generate so nothing is invented.
+ * Modes:
+ *   - score:    deterministic verdict + one LLM call for the semantic judgement.
+ *               Deliberately NO example variants — the checklist states what is
+ *               missing and "Mit KI optimieren" writes the fix when asked, so
+ *               throwaway suggestions would only burn tokens.
+ *   - rewrite:  LLM proposal, measured afterwards, retried with the concrete
+ *               violations until it passes or the attempt budget runs out
+ *   - generate: same, but written from the page's real content
  */
 final class TextOptimizer
 {
-    private const SCORE_SCHEMA = [
-        'name' => 'optimize_score',
-        'schema' => [
-            'type' => 'object',
-            'properties' => [
-                'score' => ['type' => 'integer', 'description' => '0-100'],
-                'reason' => ['type' => 'string', 'description' => 'Ein Satz Begründung'],
-                'alternatives' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => '2-3 bessere Varianten'],
-            ],
-            'required' => ['score', 'reason', 'alternatives'],
-            'additionalProperties' => false,
-        ],
-    ];
-
     private const REWRITE_SCHEMA = [
         'name' => 'optimize_rewrite',
         'schema' => [
@@ -59,10 +50,61 @@ final class TextOptimizer
         ],
     ];
 
+    /**
+     * The semantic half of the verdict. PHP can measure form (length, variety,
+     * repetition) but never MEANING — whether the sentences belong together,
+     * match the page's subject and actually say something. The model answers
+     * yes/no on exactly those three points; it never assigns a number, because
+     * models are bad at numbers and good at judgements.
+     */
+    private const SEMANTIC_SCHEMA = [
+        'name' => 'semantic_check',
+        'schema' => [
+            'type' => 'object',
+            'properties' => [
+                'coherent' => ['type' => 'boolean', 'description' => 'Roter Faden: gehören die Aussagen inhaltlich zusammen?'],
+                'onTopic' => ['type' => 'boolean', 'description' => 'Passt der Inhalt zum Seitenthema?'],
+                'substantial' => ['type' => 'boolean', 'description' => 'Konkrete, informative Aussagen statt Geschwafel?'],
+                'issue' => ['type' => 'string', 'description' => 'Ein kurzer Satz, was inhaltlich fehlt (leer wenn alles erfüllt)'],
+            ],
+            'required' => ['coherent', 'onTopic', 'substantial', 'issue'],
+            'additionalProperties' => false,
+        ],
+    ];
+
+    /** LLM attempts per rewrite before the best result is returned. */
+    private const MAX_ATTEMPTS = 3;
+
+    /**
+     * The rules, worded exactly as {@see FieldScorer} measures them, so the
+     * model optimises against the real yardstick.
+     */
+    private const RULES = [
+        'headline' => "1. Länge 30-65 Zeichen (harte Grenze).\n"
+            . "2. Benennt das konkrete Thema — keine Floskeln wie „Unsere Leistungen“, „Über uns“, „Willkommen“.\n"
+            . "3. Aktive Sprache: keine Passivformen (wird/werden/wurde).\n"
+            . "4. Entweder Frageform ODER eine Aussage mit mindestens vier bedeutungstragenden Wörtern — beides zählt als erfüllt.\n"
+            . "5. Nicht identisch mit einer anderen Überschrift der Seite.\n"
+            . '6. Kein Markdown, kein HTML, keine Anführungszeichen.',
+        'text' => "1. Mindestens 40 Wörter — darunter zählt der Text als Stummel.\n"
+            . "2. Zielumfang 120 Wörter oder mehr — mit echtem Inhalt. Kein Satz darf sich wiederholen, "
+            . "und der Wortschatz muss abwechslungsreich sein (Füllen durch Wiederholung wird erkannt und abgewertet).\n"
+            . "3. Ab 120 Wörtern in mehrere <p>-Absätze gliedern.\n"
+            . "4. Der erste Satz beantwortet das Thema direkt und hat höchstens 25 Wörter.\n"
+            . "5. Durchschnittlich höchstens 18 Wörter pro Satz.\n"
+            . "6. Höchstens jeder vierte Satz mit Passivform.\n"
+            . "7. Keine Floskeln („In der heutigen Zeit“, „Willkommen“).\n"
+            . "8. Gut verständlich schreiben: kurze, gebräuchliche Wörter statt langer Komposita, "
+            . "keine verschachtelten Nebensatzketten (Lesbarkeitswert mindestens 40 von 100).\n"
+            . "9. Mindestens jeder sechste Satz beginnt mit oder enthält ein Übergangswort "
+            . "(„außerdem“, „daher“, „zunächst“, „allerdings“, „beispielsweise“), damit der Text argumentiert statt aufzählt.\n"
+            . '10. Nur die HTML-Tags <p>, <strong>, <em>, <ul>, <ol>, <li>. Keine erfundenen Fakten.',
+    ];
+
     public function __construct(
         private readonly AiGateway $ai,
-        private readonly VerdictCache $cache,
         private readonly PageContextResolver $context,
+        private readonly FieldScorer $scorer,
     ) {
     }
 
@@ -84,57 +126,135 @@ final class TextOptimizer
         return match ($mode) {
             'rewrite' => $this->rewrite($fieldType, $value, $ctx, false),
             'generate' => $this->rewrite($fieldType, '', $ctx, true),
-            default => $this->score($table, $rowId, $fieldType, $value, $ctx),
+            default => $this->score($fieldType, $value, $ctx),
         };
     }
 
     /**
      * @param array<string, mixed> $ctx
      */
-    private function score(string $table, int $rowId, string $fieldType, string $value, array $ctx): PanelResult
+    private function score(string $fieldType, string $value, array $ctx): PanelResult
     {
         $plain = trim(strip_tags($value));
-        $siblings = $fieldType === 'headline' ? (array) $ctx['siblingHeadlines'] : [];
+        $keyword = trim((string) ($ctx['focusKeyword'] ?? ''));
+        $siblings = $fieldType === 'headline' ? $this->otherHeadlines($ctx, $plain) : [];
 
-        $cacheKey = $this->cache->key('optimize_score', $fieldType, $plain, (string) $ctx['pageTitle']);
+        // Form (PHP) + meaning (LLM) — neither alone is enough.
+        $measured = $this->scorer->score(
+            $fieldType,
+            $value,
+            $keyword,
+            $siblings,
+            $this->semanticChecks($fieldType, $plain, $ctx),
+        );
+        // No example variants: the checklist already says what is missing, and
+        // "Mit KI optimieren" writes the improved version on demand. Generating
+        // three throwaway suggestions on every check burns tokens for nothing.
+        return new PanelResult($measured['score'], $this->explain($measured), [], false, '', $measured['checks']);
+    }
 
-        $cached = $this->cache->get($cacheKey);
-        if ($cached !== null) {
-            return $cached;
+    /**
+     * Asks the model for three yes/no judgements about MEANING and turns them
+     * into weighted criteria. Returns [] when the text is too short to judge or
+     * the model is unavailable — the form-based verdict then stands alone.
+     *
+     * @param array<string, mixed> $ctx
+     * @return list<array{label: string, ok: bool, note: string, weight: float, fix: string, soft: bool, cap?: int|null, grade?: string|null}>
+     */
+    private function semanticChecks(string $fieldType, string $plain, array $ctx): array
+    {
+        if (mb_strlen($plain) < 15) {
+            return [];
         }
 
-        $langRule = ' Begründung UND Alternativen in derselben Sprache wie der bewertete Text.';
-        $system = $fieldType === 'headline'
-            ? 'Du bewertest Überschriften (SEO + AEO). Antworte über das JSON-Schema. Kriterien: konkret, enthält das Thema, '
-                . 'gute Länge (<70 Zeichen), aktiv, ggf. Frageform (KI-Suchmaschinen zitieren Fragen). '
-                . '2-3 Alternativen; mind. eine als Frage, wenn sinnvoll.' . $langRule
-            : 'Du bewertest Fließtexte für SEO/AEO. Antworte über das JSON-Schema. Kriterien: erste Aussage beantwortet '
-                . 'das Thema direkt (Antwort-zuerst), klare Struktur, konkrete Fakten, keine Floskeln, gute Lesbarkeit. '
-                . '2-3 kurze Verbesserungshinweise als "alternatives".' . $langRule;
+        $system = 'Du prüfst AUSSCHLIESSLICH den Inhalt, niemals Form, Länge oder Rechtschreibung. '
+            . "Antworte über das JSON-Schema mit drei Ja/Nein-Urteilen:\n"
+            . "- coherent: Haben die Sätze einen roten Faden und gehören inhaltlich zusammen? Zusammenhanglos "
+            . "aneinandergereihte Aussagen oder Themensprünge sind NICHT kohärent.\n"
+            . "- onTopic: Passt der Inhalt zum angegebenen Seitenthema?\n"
+            . "- substantial: Enthält er konkrete, informative Aussagen statt Floskeln, Gerede oder Fantasie?\n"
+            . 'Sei streng und ehrlich. „issue“: ein kurzer Satz auf Deutsch, was inhaltlich nicht stimmt (leer, wenn alles erfüllt).';
 
-        $user = "Sprache: {$ctx['language']}\n"
-            . ($ctx['pageTitle'] !== '' ? "Seite: {$ctx['pageTitle']}\n" : '')
-            . ($siblings !== [] ? "Andere Überschriften der Seite:\n- " . implode("\n- ", \array_slice(array_map('strval', $siblings), 0, 12)) . "\n" : '')
-            . "\nZu bewerten ({$fieldType}):\n{$plain}";
+        $user = 'Seitenthema: ' . ($ctx['pageTitle'] !== '' ? $ctx['pageTitle'] : '(unbekannt)') . "\n"
+            . ($fieldType === 'headline' ? "Zu prüfende Überschrift:\n" : "Zu prüfender Text:\n")
+            . mb_substr($plain, 0, 3000);
 
-        $response = $this->ai->complete(new PromptBundle(
-            systemPrompt: $system,
-            userPrompt: $user,
-            model: '',
-            temperature: 0.3,
-            maxTokens: 600,
-            responseSchema: self::SCORE_SCHEMA,
-            purpose: 'optimize_score_' . $fieldType,
-        ));
-
-        $result = PanelResult::fromArray($response->asJson() ?? []);
-        if ($result->reason === '') {
-            return new PanelResult(50, 'KI-Antwort unvollständig — bitte erneut prüfen.', []);
+        try {
+            $response = $this->ai->complete(new PromptBundle(
+                systemPrompt: $system,
+                userPrompt: $user,
+                model: '',
+                temperature: 0.0,
+                maxTokens: 300,
+                responseSchema: self::SEMANTIC_SCHEMA,
+                purpose: 'optimize_semantic_' . $fieldType,
+            ));
+        } catch (\Throwable) {
+            return []; // no AI → form-only verdict, honestly reported
         }
 
-        $this->cache->put($cacheKey, $result);
+        $json = $response->asJson();
+        if (!\is_array($json) || !\array_key_exists('coherent', $json)) {
+            return [];
+        }
 
-        return $result;
+        $issue = trim((string) ($json['issue'] ?? ''));
+
+        // These are KNOCK-OUT criteria: perfect form cannot rescue a text that
+        // says nothing or belongs on another page, so a failure caps the score.
+        return [
+            [
+                'label' => 'Roter Faden',
+                'ok' => (bool) $json['coherent'],
+                'note' => '',
+                'weight' => 3.0,
+                'fix' => 'Die Aussagen hängen inhaltlich nicht zusammen' . ($issue !== '' ? ' — ' . $issue : '') . '.',
+                'soft' => false,
+                'cap' => 20,
+            ],
+            [
+                'label' => 'Zum Seitenthema passend',
+                'ok' => (bool) ($json['onTopic'] ?? false),
+                'note' => '',
+                'weight' => 2.0,
+                'fix' => 'Der Inhalt passt nicht zum Thema dieser Seite.',
+                'soft' => false,
+                'cap' => 40,
+            ],
+            [
+                'label' => 'Konkrete Aussagen',
+                'ok' => (bool) ($json['substantial'] ?? false),
+                'note' => '',
+                'weight' => 2.0,
+                'fix' => 'Zu wenig Substanz — konkrete, nachvollziehbare Aussagen statt allgemeinem Gerede.',
+                'soft' => false,
+                'cap' => 50,
+            ],
+        ];
+    }
+
+    /**
+     * Plain-language verdict built from the measured checks — no LLM involved.
+     *
+     * @param array{score: int, violations: list<string>, hints: list<string>, checks: list<array{label: string, ok: bool, note: string, soft: bool, fix: string}>} $measured
+     */
+    private function explain(array $measured): string
+    {
+        $passed = [];
+        foreach ($measured['checks'] as $check) {
+            if ($check['ok']) {
+                $passed[] = $check['label'] . ($check['note'] !== '' ? ' (' . $check['note'] . ')' : '');
+            }
+        }
+
+        $hint = $measured['hints'] !== [] ? ' Hinweis: ' . implode(' ', $measured['hints']) : '';
+
+        if ($measured['violations'] === []) {
+            return 'Alle Kriterien erfüllt: ' . implode(' · ', $passed) . '.' . $hint;
+        }
+
+        return 'Erfüllt: ' . (($passed !== []) ? implode(' · ', $passed) : '—')
+            . ' — Offen: ' . implode(' ', $measured['violations']) . $hint;
     }
 
     /**
@@ -149,60 +269,160 @@ final class TextOptimizer
             );
         }
 
-        if ($fieldType === 'headline') {
-            $system = $generate
-                ? 'Du schreibst eine SEO-Überschrift für einen Seitenabschnitt, basierend auf dem Seiteninhalt und '
-                    . 'dem Seitennamen. Antworte über das JSON-Schema. Kurz (<70 Zeichen), konkret, enthält das Thema, '
-                    . 'aktiv; Frageform wenn passend. Kein Markdown, keine Anführungszeichen.'
-                : 'Du optimierst eine bestehende Überschrift für SEO/AEO, ohne die Kernaussage zu ändern. '
-                    . 'Antworte über das JSON-Schema. Kurz (<70 Zeichen), konkret, aktiv. Kein Markdown, keine Anführungszeichen.';
-        } else {
-            $system = $generate
-                ? 'Du schreibst einen SEO-optimierten Fließtext für einen Seitenabschnitt, basierend AUSSCHLIESSLICH auf '
-                    . 'dem gegebenen Seiteninhalt und Seitennamen — erfinde keine Fakten. Antworte über das JSON-Schema. '
-                    . 'Erster Satz beantwortet das Thema direkt (Antwort-zuerst). Gib gültiges HTML (nur <p>, <strong>, <ul>, <li>).'
-                : 'Du optimierst einen bestehenden Text für SEO/AEO, ohne Fakten zu ändern oder zu erfinden. '
-                    . 'Antworte über das JSON-Schema. Erster Satz beantwortet das Thema direkt (Antwort-zuerst), '
-                    . 'klare Absätze, konkrete Formulierungen. Gib gültiges HTML (nur <p>, <strong>, <ul>, <li>).';
+        $keyword = trim((string) ($ctx['focusKeyword'] ?? ''));
+        $siblings = $fieldType === 'headline' ? $this->otherHeadlines($ctx, trim(strip_tags($value))) : [];
+
+        $task = $fieldType === 'headline'
+            ? ($generate
+                ? 'Du schreibst eine SEO-Überschrift für einen Seitenabschnitt, basierend auf Seiteninhalt und Seitenname.'
+                : 'Du optimierst eine bestehende Überschrift für SEO/AEO, ohne die Kernaussage zu ändern.')
+            : ($generate
+                ? 'Du schreibst einen SEO-optimierten Fließtext, basierend AUSSCHLIESSLICH auf dem gegebenen Seiteninhalt — erfinde keine Fakten.'
+                : 'Du optimierst einen bestehenden Text für SEO/AEO, ohne Fakten zu ändern oder zu erfinden.');
+
+        $system = $task . " Antworte über das JSON-Schema.\n\nDeine Fassung MUSS jede dieser Regeln erfüllen — "
+            . "sie werden anschließend maschinell geprüft:\n"
+            . self::RULES[$fieldType]
+            . "\n\nÜBER ALLEM STEHT DER SINN: Die Fassung muss ein natürlicher, sprachlich sinnvoller Ausdruck sein. "
+            . 'Eine unsinnige Wortkombination ist immer schlechter als eine erfüllte Regel. Lies deinen Vorschlag laut '
+            . 'und frage dich, ob ein Mensch das so sagen würde.'
+            . ($keyword !== ''
+                ? "\n\nDas Fokus-Keyword der Seite lautet „" . $keyword . '“. Baue es NUR ein, wenn es thematisch '
+                    . 'wirklich passt und der Satz dadurch natürlich bleibt. Passt es nicht, lässt du es weg — '
+                    . 'erzwungene Keywords sind Keyword-Stuffing und schaden.'
+                : '');
+
+        // Rewriting means IMPROVING the given text — not replacing its subject.
+        if (!$generate) {
+            $system .= "\n\nOBERSTE REGEL: Das Thema der aktuellen Fassung bleibt erhalten. Du formulierst dieselbe "
+                . 'Aussage besser — du wählst KEIN neues Thema und übernimmst nicht einfach das Hauptthema der Seite. '
+                . 'Sagt die aktuelle Fassung etwas über „uns“, bleibt es eine Aussage über „uns“; geht es um '
+                . 'Öffnungszeiten, bleibt es bei den Öffnungszeiten. Der Seiteninhalt dient NUR dazu, das bestehende '
+                . 'Thema präziser zu fassen.';
         }
+
+        $system .= $siblings !== []
+            ? "\n\nBereits vorhandene Überschriften der Seite (nicht wiederholen):\n- " . implode("\n- ", \array_slice($siblings, 0, 12))
+            : '';
 
         // Rewrite keeps the existing text's language; generate uses the page language.
         $system .= $generate
-            ? ' Sprache: ' . $ctx['language'] . '.'
-            : ' Schreibe in derselben Sprache wie die aktuelle Fassung.';
+            ? "\n\nSprache der Ausgabe: " . $ctx['language'] . '.'
+            : "\n\nSchreibe in derselben Sprache wie die aktuelle Fassung (nicht in der Sprache dieser Anweisung).";
 
-        $user = ($ctx['siteName'] !== '' ? "Website: {$ctx['siteName']}\n" : '')
-            . ($ctx['pageTitle'] !== '' ? "Seite/Abschnitt: {$ctx['pageTitle']}\n" : '')
-            . ($generate ? '' : "Aktuelle Fassung:\n" . trim(strip_tags($value)) . "\n\n")
-            . "Seiteninhalt als Kontext:\n" . mb_substr((string) $ctx['plaintext'], 0, 3500);
+        // When rewriting, the existing value leads and the page context is kept
+        // short so it cannot drown out the actual subject.
+        $baseUser = $generate
+            ? ($ctx['siteName'] !== '' ? "Website: {$ctx['siteName']}\n" : '')
+                . ($ctx['pageTitle'] !== '' ? "Seite/Abschnitt: {$ctx['pageTitle']}\n" : '')
+                . "Seiteninhalt als Grundlage:\n" . mb_substr((string) $ctx['plaintext'], 0, 3500)
+            : "DAS IST DER ZU VERBESSERNDE INHALT — sein Thema ist verbindlich:\n"
+                . trim(strip_tags($value))
+                . "\n\n--- Ab hier nur Hintergrund zur Einordnung, NICHT das Thema ---\n"
+                . ($ctx['siteName'] !== '' ? "Website: {$ctx['siteName']}\n" : '')
+                . ($ctx['pageTitle'] !== '' ? "Seite: {$ctx['pageTitle']}\n" : '')
+                . "Weiterer Seiteninhalt:\n" . mb_substr((string) $ctx['plaintext'], 0, 1200);
 
+        $purpose = ($generate ? 'optimize_generate_' : 'optimize_rewrite_') . $fieldType;
+        $maxTokens = $fieldType === 'headline' ? 400 : 1400;
+
+        $bestText = '';
+        $bestScore = -1;
+        $bestReason = '';
+        $bestChecks = [];
+        $user = $baseUser;
+
+        // Write → measure → feed the concrete violations back → write again.
+        for ($attempt = 1; $attempt <= self::MAX_ATTEMPTS; ++$attempt) {
+            $json = $this->askRewrite($system, $user, $maxTokens, $purpose . ($attempt > 1 ? '_retry' : ''));
+            $candidate = trim((string) ($json['rewrite'] ?? ''));
+
+            if ($candidate === '') {
+                continue;
+            }
+
+            if ($fieldType === 'headline') {
+                $candidate = trim(strip_tags($candidate), " \"'");
+            }
+
+            // Only the final candidate is worth a semantic call; intermediate
+            // attempts are steered by the cheap deterministic violations.
+            $measured = $this->scorer->score(
+                $fieldType,
+                $candidate,
+                $keyword,
+                $siblings,
+                $attempt === self::MAX_ATTEMPTS ? $this->semanticChecks($fieldType, trim(strip_tags($candidate)), $ctx) : [],
+            );
+
+            if ($measured['score'] > $bestScore) {
+                $bestScore = $measured['score'];
+                $bestText = $candidate;
+                $bestReason = $this->explain($measured);
+                $bestChecks = $measured['checks'];
+            }
+
+            if ($measured['violations'] === []) {
+                break; // 100/100 — done
+            }
+
+            $user = $baseUser . "\n\nDein letzter Vorschlag:\n" . $candidate
+                . "\n\nDie maschinelle Prüfung beanstandet:\n- " . implode("\n- ", $measured['violations'])
+                . "\nLiefere eine neue Fassung, die AUCH diese Punkte erfüllt, ohne die bereits erfüllten zu verlieren.";
+        }
+
+        if ($bestText === '') {
+            throw new AiException('KI lieferte keinen Text.', AiExceptionKind::InvalidResponse);
+        }
+
+        return new PanelResult(
+            score: max(0, $bestScore),
+            reason: $bestReason,
+            alternatives: [],
+            rewrite: $bestText,
+            checks: $bestChecks,
+        );
+    }
+
+    /**
+     * The page's other headlines — WITHOUT the one being edited, otherwise the
+     * duplicate check would always fire against the field's own value.
+     *
+     * @param array<string, mixed> $ctx
+     * @return list<string>
+     */
+    private function otherHeadlines(array $ctx, string $current): array
+    {
+        $current = mb_strtolower(trim($current));
+
+        $out = [];
+        foreach ((array) $ctx['siblingHeadlines'] as $headline) {
+            $text = trim((string) $headline);
+            if ($text !== '' && mb_strtolower($text) !== $current) {
+                $out[] = $text;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * One rewrite call, JSON decoded.
+     *
+     * @return array<int|string, mixed>
+     */
+    private function askRewrite(string $system, string $user, int $maxTokens, string $purpose): array
+    {
         $response = $this->ai->complete(new PromptBundle(
             systemPrompt: $system,
             userPrompt: $user,
             model: '',
             temperature: 0.5,
-            maxTokens: $fieldType === 'headline' ? 300 : 1200,
+            maxTokens: $maxTokens,
             responseSchema: self::REWRITE_SCHEMA,
-            purpose: ($generate ? 'optimize_generate_' : 'optimize_rewrite_') . $fieldType,
+            purpose: $purpose,
         ));
 
-        $json = $response->asJson() ?? [];
-        $rewrite = trim((string) ($json['rewrite'] ?? ''));
-
-        if ($rewrite === '') {
-            throw new AiException('KI lieferte keinen Text.', AiExceptionKind::InvalidResponse);
-        }
-
-        // Headlines are plain; strip any stray tags/quotes the model added.
-        if ($fieldType === 'headline') {
-            $rewrite = trim(strip_tags($rewrite), " \"'");
-        }
-
-        return new PanelResult(
-            score: 0,
-            reason: trim((string) ($json['reason'] ?? '')),
-            alternatives: [],
-            rewrite: $rewrite,
-        );
+        return $response->asJson() ?? [];
     }
 }

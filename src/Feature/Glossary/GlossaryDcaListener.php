@@ -2,11 +2,12 @@
 
 declare(strict_types=1);
 
-/**
- * @package   vtinnovations/seo-studio
- * @author    VT Innovations Team
- * @license   LGPL-3.0-or-later
- * @copyright VT Innovations 2026
+/*
+ * AI SEO Studio
+ *
+ * Package: vtinnovations/seo-studio
+ * Copyright: VT Innovations Team
+ * Licence: LGPL-3.0-or-later
  */
 
 namespace VTinnovations\SeoStudio\Feature\Glossary;
@@ -16,6 +17,7 @@ use Contao\CoreBundle\DataContainer\PaletteManipulator;
 use Contao\CoreBundle\DependencyInjection\Attribute\AsHook;
 use Contao\DataContainer;
 use VTinnovations\SeoStudio\Core\Config\FeatureState;
+use VTinnovations\SeoStudio\Core\Config\Translations;
 
 /**
  * Injects the "SEO-Titel & -Beschreibung mit KI" panel into the glossary
@@ -50,6 +52,7 @@ final class GlossaryDcaListener
     private function renderPanel(DataContainer $dc): string
     {
         $token = $this->csrfTokenManager->getDefaultTokenValue();
+        $e = static fn (string $v): string => htmlspecialchars($v, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 
         $GLOBALS['TL_JAVASCRIPT']['seo_studio_meta'] = 'bundles/vtinnovationsseostudio/meta-panel.js';
         $GLOBALS['TL_CSS']['seo_studio'] = 'bundles/vtinnovationsseostudio/backend.css';
@@ -62,14 +65,14 @@ final class GlossaryDcaListener
             . ' data-token="' . htmlspecialchars($token, ENT_QUOTES) . '"'
             . ' data-url="' . htmlspecialchars('/contao/seostudio/glossary/meta', ENT_QUOTES) . '">'
             . '<h3>SEO Studio</h3>'
-            . '<p><button type="button" class="tl_submit seo-studio-generate">SEO-Titel &amp; -Beschreibung mit KI vorschlagen</button>'
+            . '<p><button type="button" class="tl_submit seo-studio-generate">' . $e(Translations::text('glossary.proposeMetaButton')) . '</button>'
             . ' <span class="seo-studio-status" aria-live="polite"></span></p>'
             . '<div class="seo-studio-result" hidden>'
-            . '<p class="seo-studio-proposal"><strong>Titel:</strong> <span data-role="pageTitle"></span> <em data-role="pageTitleLen"></em></p>'
-            . '<p class="seo-studio-proposal"><strong>Beschreibung:</strong> <span data-role="description"></span> <em data-role="descriptionLen"></em></p>'
-            . '<p><button type="button" class="tl_submit seo-studio-apply">In Felder übernehmen</button> '
+            . '<p class="seo-studio-proposal"><strong>' . $e(Translations::text('meta.titleLabel')) . ':</strong> <span data-role="pageTitle"></span> <em data-role="pageTitleLen"></em></p>'
+            . '<p class="seo-studio-proposal"><strong>' . $e(Translations::text('meta.descriptionLabel')) . ':</strong> <span data-role="description"></span> <em data-role="descriptionLen"></em></p>'
+            . '<p><button type="button" class="tl_submit seo-studio-apply">' . $e(Translations::text('meta.applyButton')) . '</button> '
             . '<button type="button" class="tl_submit seo-studio-discard">Verwerfen</button></p>'
-            . '<p class="tl_help">Übernahme füllt nur die Formularfelder — gespeichert wird erst mit „Speichern“.</p>'
+            . '<p class="tl_help">' . $e(Translations::text('meta.applyHint')) . '</p>'
             . '</div></div>';
     }
 }

@@ -2,11 +2,12 @@
 
 declare(strict_types=1);
 
-/**
- * @package   vtinnovations/seo-studio
- * @author    VT Innovations Team
- * @license   LGPL-3.0-or-later
- * @copyright VT Innovations 2026
+/*
+ * AI SEO Studio
+ *
+ * Package: vtinnovations/seo-studio
+ * Copyright: VT Innovations Team
+ * Licence: LGPL-3.0-or-later
  */
 
 namespace VTinnovations\SeoStudio\Core\Config;
@@ -14,45 +15,37 @@ namespace VTinnovations\SeoStudio\Core\Config;
 /**
  * Single source of truth for "is feature X active right now?".
  *
- * active = toggle on AND license tier sufficient. Cheap (ConfigProvider is
- * request-cached), safe to call from loadDataContainer hooks.
+ * active = the instance is licensed for the feature AND the feature is
+ * registered AND its config toggle is on. Cheap (ConfigProvider and the
+ * entitlement result are both request-cached), safe to call from
+ * loadDataContainer hooks.
+ *
+ * This is the BROAD gate that keeps the backend surface out of an unlicensed
+ * installation. It is deliberately not the only one: every functional boundary
+ * (AJAX endpoint, backend module, cron, frontend listener, frontend module, AI
+ * gateway) checks entitlement independently, so patching or removing this one
+ * method does not unlock anything.
  */
 final class FeatureState
 {
     public function __construct(
         private readonly ConfigProvider $config,
         private readonly FeatureRegistry $registry,
-        private readonly \VTinnovations\SeoStudio\Core\Security\LicenseGuard $licenseGuard,
+        private readonly EntitlementEvaluator $entitlement,
     ) {
     }
 
     public function isEnabled(string $featureId): bool
     {
-        $feature = $this->registry->get($featureId);
-        if ($feature === null) {
+        if ($this->registry->get($featureId) === null) {
             return false;
         }
 
-        if (!$this->tierAllows($feature)) {
-            return false;
-        }
-
-        // Licence gate: locked features vanish completely (demo / expired).
-        if (!$this->licenseGuard->allowsFeature($featureId)) {
+        if (!$this->entitlement->current()->allowsFeature($featureId)) {
             return false;
         }
 
         return (bool) $this->config->get($this->toggleKey($featureId), false);
-    }
-
-    public function tierAllows(FeatureInterface $feature): bool
-    {
-        return $this->currentTier()->includes($feature->getRequiredTier());
-    }
-
-    public function currentTier(): LicenseTier
-    {
-        return LicenseTier::tryFrom((string) $this->config->get('licenseTier', 'free')) ?? LicenseTier::Free;
     }
 
     public function toggleKey(string $featureId): string

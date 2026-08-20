@@ -1,3 +1,11 @@
+/*
+ * AI SEO Studio
+ *
+ * Package: vtinnovations/seo-studio
+ * Copyright: VT Innovations Team
+ * Licence: LGPL-3.0-or-later
+ */
+
 /* SEO Studio — live social-media preview card (title/description). */
 (function () {
     'use strict';

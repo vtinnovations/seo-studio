@@ -2,11 +2,12 @@
 
 declare(strict_types=1);
 
-/**
- * @package   vtinnovations/seo-studio
- * @author    VT Innovations Team
- * @license   LGPL-3.0-or-later
- * @copyright VT Innovations 2026
+/*
+ * AI SEO Studio
+ *
+ * Package: vtinnovations/seo-studio
+ * Copyright: VT Innovations Team
+ * Licence: LGPL-3.0-or-later
  */
 
 namespace VTinnovations\SeoStudio\Controller;
@@ -19,8 +20,6 @@ use VTinnovations\SeoStudio\Core\Ai\ConnectionTester;
 use VTinnovations\SeoStudio\Core\Config\ConfigProvider;
 use VTinnovations\SeoStudio\Core\Config\FeatureRegistry;
 use VTinnovations\SeoStudio\Core\Config\FeatureState;
-use VTinnovations\SeoStudio\Core\Security\LicenseGuard;
-use VTinnovations\SeoStudio\Core\Security\LicenseManager;
 use VTinnovations\SeoStudio\Core\Security\SecretStore;
 use VTinnovations\SeoStudio\Core\Security\TokenBudget;
 
@@ -37,6 +36,11 @@ final class SettingsModule
 
     public function generate(): string
     {
+        $notice = $this->entitlementNotice();
+        if ($notice !== null) {
+            return $notice;
+        }
+
         $container = System::getContainer();
 
         /** @var ConfigProvider $config */
@@ -77,20 +81,6 @@ final class SettingsModule
             $result = $tester->test();
 
             $result->ok ? Message::addConfirmation($result->message) : Message::addError($result->message);
-
-            return;
-        }
-
-        if ($action === 'license') {
-            /** @var LicenseManager $lm */
-            $lm = $container->get(LicenseManager::class);
-            $key = (string) $request->request->get('license_key', '');
-
-            if ($lm->activate($key, $request->getHost())) {
-                Message::addConfirmation($this->trans('licenseActivated', 'Lizenz aktiviert. Vielen Dank!'));
-            } else {
-                Message::addError($this->trans('licenseInvalid', 'Lizenz ungültig') . ': ' . ($lm->lastMessage() ?: '—'));
-            }
 
             return;
         }
@@ -157,7 +147,7 @@ final class SettingsModule
             $secrets->set('ai_api_key', $apiKey);
         }
 
-        Message::addConfirmation($this->trans('saved', 'Einstellungen gespeichert.'));
+        Message::addConfirmation($this->trans('saved'));
     }
 
     private function render(
@@ -188,7 +178,7 @@ final class SettingsModule
                 '<p class="%s">%s</p>',
                 $cls,
                 $e(sprintf(
-                    $this->trans('budgetStatus', 'Token-Verbrauch diesen Monat: %s von %s (%d%%)'),
+                    $this->trans('budgetStatus'),
                     number_format($usage, 0, ',', '.'),
                     number_format($limit, 0, ',', '.'),
                     $pct,
@@ -198,7 +188,7 @@ final class SettingsModule
             $budgetInfo = sprintf(
                 '<p class="tl_info">%s</p>',
                 $e(sprintf(
-                    $this->trans('budgetStatusUnlimited', 'Token-Verbrauch diesen Monat: %s (kein Limit gesetzt)'),
+                    $this->trans('budgetStatusUnlimited'),
                     number_format($usage, 0, ',', '.'),
                 )),
             );
@@ -207,26 +197,28 @@ final class SettingsModule
         // Feature toggles
         $featureRows = '';
         foreach ($registry->all() as $id => $feature) {
-            $allowed = $featureState->tierAllows($feature);
             $checked = (bool) $config->get('feature' . ucfirst($id), false);
-            $label = $this->trans('features.' . $id, $feature->getLabel());
+            $label = $this->trans('features.' . $id);
 
             $featureRows .= sprintf(
                 '<div class="widget w50 cbx"><div id="ctrl_feature_%1$s" class="tl_checkbox_single_container">'
-                . '<input type="checkbox" name="feature_%1$s" id="opt_feature_%1$s" class="tl_checkbox" value="1"%2$s%3$s> '
-                . '<label for="opt_feature_%1$s">%4$s%5$s</label></div></div>',
+                . '<input type="checkbox" name="feature_%1$s" id="opt_feature_%1$s" class="tl_checkbox" value="1"%2$s> '
+                . '<label for="opt_feature_%1$s">%3$s</label></div></div>',
                 $e($id),
-                $checked && $allowed ? ' checked' : '',
-                $allowed ? '' : ' disabled',
+                $checked ? ' checked' : '',
                 $e($label),
-                $allowed ? '' : ' <span class="seo-studio-muted">(' . $e($this->trans('tierLocked', 'höherer Tarif nötig')) . ')</span>',
             );
         }
 
         $selected = static fn (string $a, string $b): string => $a === $b ? ' selected' : '';
         $checkedIf = static fn (bool $v): string => $v ? ' checked' : '';
 
-        $t = fn (string $key, string $fallback): string => $e($this->trans($key, $fallback));
+        $t = fn (string $key, string $fallback): string => $e($this->trans($key));
+        // Raw variant for help texts that intentionally carry markup (<strong>,
+        // <code>, entities). These strings are our own translations, never user
+        // input, so emitting them unescaped is safe — and $t() would double-encode
+        // them (showing literal "<strong>" / "&amp;").
+        $traw = fn (string $key, string $fallback): string => $this->trans($key);
 
         $this->registerTabAssets();
 
@@ -282,34 +274,50 @@ final class SettingsModule
         // ── Schema.org ──────────────────────────────────────────────
         $schemaFieldset = '<fieldset class="tl_tbox block">'
             . '<legend>' . $t('legendSchema', 'Strukturierte Daten (Schema.org)') . '</legend>'
+            . '<div class="widget clr long"><p class="seo-studio-fieldhelp seo-studio-fieldhelp--intro">'
+            . $traw(
+                'help.schemaIntro',
+                '<strong>Wozu das Ganze?</strong> Google, ChatGPT &amp; Co. lesen deine Seite als Text und müssen raten, '
+                    . 'wer dahintersteht. Hier hinterlegst du das einmal maschinenlesbar: Wer ist die Firma, wie heißt sie, '
+                    . 'wo ist ihr Logo, wo ihre Profile. SEO Studio schreibt daraus ein unsichtbares Datenblatt (JSON-LD) in '
+                    . 'jede Seite. Du musst nichts davon können — Felder ausfüllen genügt. '
+                    . '<strong>Wenn du nur eine Sache machst: trag den Firmennamen ein.</strong>',
+            )
+            . '</p></div>'
             . '<div class="widget w50"><h3><label for="ctrl_schemaOrgName">' . $t('schemaOrgName', 'Organisation: Name') . '</label></h3>'
-            . '<input type="text" name="schemaOrgName" id="ctrl_schemaOrgName" class="tl_text" value="' . $e($config->get('schemaOrgName', '')) . '"></div>'
+            . '<input type="text" name="schemaOrgName" id="ctrl_schemaOrgName" class="tl_text" value="' . $e($config->get('schemaOrgName', '')) . '">'
+            . '<p class="seo-studio-fieldhelp">' . $t('help.orgName', 'Der offizielle Firmen- oder Websitename, z. B. „V&T Innovations GmbH“. Solange dieses Feld leer ist, fehlen dir 3 GEO-Punkte pro Seite.') . '</p></div>'
             . '<div class="widget w50"><h3><label for="ctrl_schemaOrgLogo">' . $t('schemaOrgLogo', 'Organisation: Logo-URL') . '</label></h3>'
-            . '<input type="text" name="schemaOrgLogo" id="ctrl_schemaOrgLogo" class="tl_text" value="' . $e($config->get('schemaOrgLogo', '')) . '" placeholder="https://.../logo.png"></div>'
+            . '<input type="text" name="schemaOrgLogo" id="ctrl_schemaOrgLogo" class="tl_text" value="' . $e($config->get('schemaOrgLogo', '')) . '" placeholder="https://.../logo.png">'
+            . '<p class="seo-studio-fieldhelp">' . $t('help.orgLogo', 'Vollständige Adresse deines Logos, beginnend mit https://. Rechtsklick aufs Logo im Frontend → „Bildadresse kopieren“. Optional.') . '</p></div>'
             . '<div class="widget clr long"><h3><label for="ctrl_schemaOrgSameAs">' . $t('schemaOrgSameAs', 'Organisation: Profile (sameAs, eine URL pro Zeile)') . '</label></h3>'
-            . '<textarea name="schemaOrgSameAs" id="ctrl_schemaOrgSameAs" class="tl_textarea" rows="3">' . $e(implode("\n", (array) $config->get('schemaOrgSameAs', []))) . '</textarea></div>'
+            . '<textarea name="schemaOrgSameAs" id="ctrl_schemaOrgSameAs" class="tl_textarea" rows="3">' . $e(implode("\n", (array) $config->get('schemaOrgSameAs', []))) . '</textarea>'
+            . '<p class="seo-studio-fieldhelp">' . $t('help.orgSameAs', 'Deine Profile anderswo — LinkedIn, Instagram, Facebook, XING, Wikipedia. Eine vollständige URL pro Zeile. Damit erkennen Suchmaschinen, dass diese Profile und diese Website dieselbe Firma sind. Optional, leer lassen ist völlig in Ordnung.') . '</p></div>'
+            . '<div class="widget clr long"><p class="seo-studio-fieldhelp seo-studio-fieldhelp--intro">'
+            . $traw('help.schemaTypesIntro', '<strong>Welche Datenblätter ausgeliefert werden.</strong> Im Zweifel alle drei angehakt lassen — sie schaden nie und greifen nur, wo sie passen.') . '</p></div>'
             . '<div class="widget w50 cbx"><div class="tl_checkbox_single_container">'
             . '<input type="checkbox" name="schemaEnableOrganization" id="ctrl_seOrg" class="tl_checkbox" value="1"' . $checkedIf((bool) $config->get('schemaEnableOrganization', true)) . '> '
-            . '<label for="ctrl_seOrg">Organization</label></div></div>'
+            . '<label for="ctrl_seOrg">Organization</label></div>'
+            . '<p class="seo-studio-fieldhelp">' . $t('help.schemaOrganization', 'Die Firmenangaben von oben. Grundlage für den Info-Kasten rechts neben den Google-Treffern.') . '</p></div>'
             . '<div class="widget w50 cbx"><div class="tl_checkbox_single_container">'
             . '<input type="checkbox" name="schemaEnableBreadcrumb" id="ctrl_seBc" class="tl_checkbox" value="1"' . $checkedIf((bool) $config->get('schemaEnableBreadcrumb', true)) . '> '
-            . '<label for="ctrl_seBc">BreadcrumbList</label></div></div>'
+            . '<label for="ctrl_seBc">BreadcrumbList</label></div>'
+            . '<p class="seo-studio-fieldhelp">' . $t('help.schemaBreadcrumb', 'Der Pfad der Seite im Seitenbaum. Google zeigt dann „Start › Leistungen › Beratung“ statt einer nackten URL.') . '</p></div>'
             . '<div class="widget w50 cbx"><div class="tl_checkbox_single_container">'
             . '<input type="checkbox" name="schemaEnableArticle" id="ctrl_seArt" class="tl_checkbox" value="1"' . $checkedIf((bool) $config->get('schemaEnableArticle', true)) . '> '
-            . '<label for="ctrl_seArt">Article (News)</label></div></div>'
+            . '<label for="ctrl_seArt">Article (News)</label></div>'
+            . '<p class="seo-studio-fieldhelp">' . $t('help.schemaArticle', 'Nur für Nachrichten-Beiträge: Autor und Datum werden mitgeliefert. Ohne News-Modul wirkungslos.') . '</p></div>'
             . '<div class="widget clr long"><h3>' . $t('llmsTxtSummary', 'llms.txt: Kurzbeschreibung der Website') . '</h3>'
-            . '<p>' . ($config->get('llmsTxtSummaryText', '') !== '' ? $e($config->get('llmsTxtSummaryText', '')) : '<em>noch keine — per KI erzeugen oder leer lassen</em>') . '</p>'
+            . '<p class="seo-studio-fieldhelp">' . $traw('help.llmsTxt', 'Etwas anderes als Schema.org: <code>llms.txt</code> ist eine Datei, die KI-Systeme aufrufen, um in zwei Sätzen zu erfahren, worum es auf dieser Website geht — wie eine robots.txt, nur für Inhalt statt Zugriff. Ein Satz genügt, KI schreibt ihn auf Knopfdruck aus deinen echten Seiten.') . '</p>'
+            . '<p>' . ($config->get('llmsTxtSummaryText', '') !== '' ? $e($config->get('llmsTxtSummaryText', '')) : '<em>' . $t('help.llmsTxtEmpty', 'noch keine — per KI erzeugen oder leer lassen') . '</em>') . '</p>'
             . '<button type="submit" class="tl_submit" onclick="this.form.seoStudioAction.value=\'llmssummary\'">' . $t('llmsSummaryGenerate', 'Mit KI erzeugen') . '</button></div>'
             . '</fieldset>';
 
-        $licenseFieldset = $this->renderLicenseFieldset($e, $container);
-
         $tabs = $this->renderTabs('settings', [
-            ['license', $this->trans('legendLicense', 'Lizenz'), $licenseFieldset],
-            ['ai', $this->trans('legendAi', 'KI-Einstellungen'), $aiFieldset],
-            ['features', $this->trans('legendFeatures', 'Funktionen'), $featuresFieldset],
-            ['behavior', $this->trans('legendBehavior', 'Verhalten'), $behaviorFieldset],
-            ['schema', $this->trans('legendSchema', 'Strukturierte Daten'), $schemaFieldset],
+            ['ai', $this->trans('legendAi'), $aiFieldset],
+            ['features', $this->trans('legendFeatures'), $featuresFieldset],
+            ['behavior', $this->trans('legendBehavior'), $behaviorFieldset],
+            ['schema', $this->trans('legendSchema'), $schemaFieldset],
         ]);
 
         $intro = '<p>Zentrale Einstellungen für KI-Anbieter, Funktionen, Verhalten und strukturierte Daten. '
@@ -328,53 +336,4 @@ final class SettingsModule
         return $this->renderShell($intro, $form);
     }
 
-    /**
-     * @param callable(mixed):string $e
-     */
-    private function renderLicenseFieldset(callable $e, mixed $container): string
-    {
-        /** @var LicenseManager $lm */
-        $lm = $container->get(LicenseManager::class);
-        /** @var LicenseGuard $guard */
-        $guard = $container->get(LicenseGuard::class);
-
-        $status = match ($guard->state()) {
-            LicenseGuard::STATE_LICENSED => '<p class="tl_confirm">' . $e($this->trans('licenseActive', 'Lizenz aktiv'))
-                . ($lm->getExpiresAt() !== null
-                    ? ' — ' . $e($this->trans('licenseUntil', 'gültig bis')) . ' ' . date('d.m.Y', (int) $lm->getExpiresAt())
-                    : ' (' . $e($this->trans('licenseLifetime', 'unbegrenzt')) . ')') . '.</p>',
-            LicenseGuard::STATE_DEMO => '<p class="tl_info">' . $e(sprintf(
-                $this->trans('licenseDemo', 'Demo-Lizenz aktiv — noch %d Tag(e). Frei: SEO-Score, Analyse, Schema.org, Social, Meta. Gesperrt: Text-Optimierung, Glossar, FAQ, SEO/GEO/AEO-Score, Aktualität, llms.txt, Bilder.'),
-                $guard->demoDaysLeft(),
-            )) . '</p>',
-            default => '<p class="tl_error">' . $e($this->trans('licenseUnlicensedMsg', 'Keine gültige Lizenz — bitte Schlüssel eintragen. Auch die Demo benötigt einen (kostenlosen) Schlüssel; alle Funktionen sind bis dahin gesperrt.')) . '</p>',
-        };
-
-        $key = $e($lm->getLicenseKey());
-
-        return '<fieldset class="tl_tbox block"><legend>' . $this->trans('legendLicense', 'Lizenz') . '</legend>'
-            . $status
-            . '<p>' . $this->trans('licenseIntro', 'Kostenlose Demo-Lizenz und Vollversion erhältlich auf')
-            . ' <a href="https://v-t.one" target="_blank" rel="noreferrer">v-t.one</a>.</p>'
-            . '<div class="widget clr long"><h3><label for="ctrl_license_key">' . $this->trans('licenseKeyLabel', 'Lizenzschlüssel') . '</label></h3>'
-            . '<input type="text" name="license_key" id="ctrl_license_key" class="tl_text" value="' . $key . '" autocomplete="off" spellcheck="false" placeholder="' . $e($this->trans('licenseKeyPlaceholder', 'Lizenzschlüssel eintragen')) . '"></div>'
-            . '<div class="tl_submit_container" style="margin-top:8px">'
-            . '<button type="submit" class="tl_submit" onclick="this.form.seoStudioAction.value=\'license\'">' . $this->trans('licenseActivate', 'Lizenz aktivieren') . '</button>'
-            . '</div>'
-            . '</fieldset>';
-    }
-
-    private function trans(string $key, string $fallback): string
-    {
-        $value = $GLOBALS['TL_LANG']['SEO_STUDIO'] ?? null;
-
-        foreach (explode('.', $key) as $segment) {
-            if (!\is_array($value) || !isset($value[$segment])) {
-                return $fallback;
-            }
-            $value = $value[$segment];
-        }
-
-        return \is_string($value) && $value !== '' ? $value : $fallback;
-    }
 }

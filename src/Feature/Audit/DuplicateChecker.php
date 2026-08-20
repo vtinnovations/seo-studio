@@ -2,16 +2,18 @@
 
 declare(strict_types=1);
 
-/**
- * @package   vtinnovations/seo-studio
- * @author    VT Innovations Team
- * @license   LGPL-3.0-or-later
- * @copyright VT Innovations 2026
+/*
+ * AI SEO Studio
+ *
+ * Package: vtinnovations/seo-studio
+ * Copyright: VT Innovations Team
+ * Licence: LGPL-3.0-or-later
  */
 
 namespace VTinnovations\SeoStudio\Feature\Audit;
 
 use Doctrine\DBAL\Connection;
+use VTinnovations\SeoStudio\Core\Config\Translations;
 
 /**
  * Site-wide duplicate detection: identical pageTitle or description on more
@@ -77,7 +79,7 @@ final class DuplicateChecker
 
         $warnings = [];
 
-        foreach (['pageTitle' => 'Seitentitel', 'description' => 'Beschreibung'] as $field => $label) {
+        foreach (['pageTitle' => Translations::text('audit.fieldPageTitle'), 'description' => Translations::text('audit.fieldDescription')] as $field => $label) {
             $value = trim((string) $row[$field]);
             if ($value === '') {
                 continue;
@@ -90,7 +92,7 @@ final class DuplicateChecker
 
             foreach ($others as $other) {
                 $warnings[] = sprintf(
-                    'SEO Studio: %s ist identisch mit Seite „%s“ (ID %d) — Duplikate schwächen beide Seiten im Ranking.',
+                    Translations::text('audit.duplicateWarning'),
                     $label,
                     (string) $other['title'],
                     (int) $other['id'],

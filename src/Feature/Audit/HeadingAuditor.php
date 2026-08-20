@@ -2,15 +2,17 @@
 
 declare(strict_types=1);
 
-/**
- * @package   vtinnovations/seo-studio
- * @author    VT Innovations Team
- * @license   LGPL-3.0-or-later
- * @copyright VT Innovations 2026
+/*
+ * AI SEO Studio
+ *
+ * Package: vtinnovations/seo-studio
+ * Copyright: VT Innovations Team
+ * Licence: LGPL-3.0-or-later
  */
 
 namespace VTinnovations\SeoStudio\Feature\Audit;
 
+use VTinnovations\SeoStudio\Core\Config\Translations;
 use VTinnovations\SeoStudio\Core\Content\ContentExtractor;
 use VTinnovations\SeoStudio\Core\Content\HeadingNode;
 
@@ -40,12 +42,12 @@ final class HeadingAuditor
         if (\count($h1) === 0) {
             $findings[] = [
                 'severity' => 'info',
-                'message' => 'Keine H1 im Seiteninhalt. OK, wenn das Layout den Seitentitel als H1 rendert — sonst eine Überschrift auf H1 stellen.',
+                'message' => Translations::text('audit.noH1'),
             ];
         } elseif (\count($h1) > 1) {
             $findings[] = [
                 'severity' => 'error',
-                'message' => sprintf('%d H1-Überschriften im Inhalt („%s“ …) — genau eine H1 pro Seite.', \count($h1), $h1[0]->text),
+                'message' => Translations::text('audit.multipleH1', \count($h1), $h1[0]->text),
             ];
         }
 
@@ -69,12 +71,12 @@ final class HeadingAuditor
         if ($content->headings !== [] && $content->wordCount > 300 && \count($content->headings) === 1) {
             $findings[] = [
                 'severity' => 'info',
-                'message' => sprintf('%d Wörter, aber nur eine Überschrift — Zwischenüberschriften verbessern Lesbarkeit und AEO-Zitierfähigkeit.', $content->wordCount),
+                'message' => Translations::text('audit.needsSubheadings', $content->wordCount),
             ];
         }
 
         if ($findings === []) {
-            $findings[] = ['severity' => 'ok', 'message' => 'Überschriften-Struktur in Ordnung.'];
+            $findings[] = ['severity' => 'ok', 'message' => Translations::text('audit.headingsOk')];
         }
 
         return $findings;

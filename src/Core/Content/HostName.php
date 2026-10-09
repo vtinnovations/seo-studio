@@ -157,12 +157,19 @@ final class HostName
      * signed list that fails this is rejected rather than repaired, because
      * repairing it locally would change what was signed.
      *
+     * $allowEmpty is the one difference between reading a GRANT and reading a
+     * WITHDRAWAL. A grant must name at least one authorised host or it grants
+     * nothing, so an empty set there is a fault. A withdrawal states the hosts
+     * the licence authorises AFTER the change, and that set is legitimately
+     * empty once the customer has released their last domain — refusing it
+     * would make the final withdrawal the one packet we cannot accept.
+     *
      * @param list<mixed> $hosts
      */
-    public static function isCanonicalSet(array $hosts): bool
+    public static function isCanonicalSet(array $hosts, bool $allowEmpty = false): bool
     {
         if ($hosts === []) {
-            return false;
+            return $allowEmpty;
         }
 
         $previous = null;

@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 namespace VTinnovations\SeoStudio\Feature\Optimize;
 
+use VTinnovations\SeoStudio\Core\Config\Translations;
 use VTinnovations\SeoStudio\Core\Content\GermanText;
 
 /**
@@ -77,49 +78,49 @@ final class FieldScorer
 
         $checks = [];
 
-        $this->add($checks, 'Nicht leer', $plain !== '', 2.0, 'Überschrift darf nicht leer sein.', $len . ' Zeichen');
+        $this->add($checks, Translations::text('fieldScore.headline.notEmpty.label'), $plain !== '', 2.0, Translations::text('fieldScore.headline.notEmpty.fix'), Translations::text('fieldScore.charCount', $len));
 
         $this->add(
             $checks,
-            'Länge 30–65 Zeichen',
+            Translations::text('fieldScore.headline.length.label'),
             $len >= 30 && $len <= 65,
             2.0,
             $len < 30
-                ? 'Zu kurz (' . $len . ' Zeichen) — auf 30–65 Zeichen ausbauen und konkreter werden.'
-                : 'Zu lang (' . $len . ' Zeichen) — auf höchstens 65 Zeichen kürzen.',
-            $len . ' Zeichen',
+                ? Translations::text('fieldScore.headline.length.tooShort', $len)
+                : Translations::text('fieldScore.headline.length.tooLong', $len),
+            Translations::text('fieldScore.charCount', $len),
         );
 
         $this->add(
             $checks,
-            'Konkret statt Floskel',
+            Translations::text('fieldScore.headline.concrete.label'),
             !$this->hasFiller($lower) && \count($words) >= 3,
             2.0,
-            'Zu allgemein — benenne das konkrete Thema statt einer Floskel wie „Unsere Leistungen“.',
+            Translations::text('fieldScore.headline.concrete.fix'),
         );
 
         $this->add(
             $checks,
-            'Aktive Sprache',
+            Translations::text('check.activeVoice.label'),
             preg_match(self::PASSIVE, $plain) !== 1,
             1.0,
-            'Passiv vermeiden — aktiv formulieren.',
+            Translations::text('fieldScore.headline.activeVoice.fix'),
         );
 
         $this->add(
             $checks,
-            'Keine Dopplung',
+            Translations::text('fieldScore.headline.duplicate.label'),
             !$this->duplicates($lower, $siblings),
             1.0,
-            'Eine andere Überschrift der Seite lautet fast gleich — klar abgrenzen.',
+            Translations::text('fieldScore.headline.duplicate.fix'),
         );
 
         $this->add(
             $checks,
-            'Sauberes Format',
+            Translations::text('fieldScore.headline.format.label'),
             preg_match('/["“”*_#|]|<[a-z]/i', $plain) !== 1,
             1.0,
-            'Keine Anführungszeichen, kein Markdown, kein HTML.',
+            Translations::text('fieldScore.headline.format.fix'),
         );
 
         // AEO is satisfiable EITHER WAY — a question or a statement that names
@@ -127,11 +128,11 @@ final class FieldScorer
         $isQuestion = str_ends_with($plain, '?');
         $this->add(
             $checks,
-            'Beantwortet ein Nutzeranliegen',
+            Translations::text('fieldScore.headline.answersIntent.label'),
             $isQuestion || \count($words) >= 4,
             1.5,
-            'Zu vage — entweder als Frage formulieren oder das Thema mit mindestens vier bedeutungstragenden Wörtern benennen.',
-            $isQuestion ? 'Frageform' : 'Aussageform',
+            Translations::text('fieldScore.headline.answersIntent.fix'),
+            $isQuestion ? Translations::text('fieldScore.questionForm') : Translations::text('fieldScore.statementForm'),
         );
 
         // SOFT: a focus keyword belongs in the page title and H1 — forcing it
@@ -140,10 +141,10 @@ final class FieldScorer
         if ($keyword !== '') {
             $this->add(
                 $checks,
-                'Fokus-Keyword enthalten',
+                Translations::text('fieldScore.keywordPresent.label'),
                 $this->containsKeyword($lower, $keyword),
                 0.0,
-                'Das Fokus-Keyword „' . $keyword . '“ kommt nicht vor — nur einbauen, wenn es thematisch wirklich passt.',
+                Translations::text('fieldScore.keywordMissing.fix', $keyword),
                 '',
                 true,
             );
@@ -177,30 +178,30 @@ final class FieldScorer
 
         $this->add(
             $checks,
-            'Mindestlänge (40 Wörter)',
+            Translations::text('fieldScore.text.minLength.label'),
             $wordCount >= self::TEXT_MIN_WORDS,
             2.0,
-            'Zu wenig Text (' . $wordCount . ' Wörter) — auf mindestens ' . self::TEXT_MIN_WORDS . ' Wörter ausbauen.',
-            $wordCount . ' Wörter',
+            Translations::text('fieldScore.text.minLength.fix', $wordCount, self::TEXT_MIN_WORDS),
+            Translations::text('fieldScore.wordCount', $wordCount),
         );
 
         $this->add(
             $checks,
-            'Substanzieller Umfang (120+ Wörter)',
+            Translations::text('fieldScore.text.substantial.label'),
             $wordCount >= self::TEXT_GOOD_WORDS,
             1.5,
-            'Nur ' . $wordCount . ' Wörter — Suchmaschinen bevorzugen Substanz, Richtwert ' . self::TEXT_GOOD_WORDS . '+ Wörter.',
+            Translations::text('fieldScore.text.substantial.fix', $wordCount, self::TEXT_GOOD_WORDS),
         );
 
         // Structure only becomes a meaningful signal once there is real text.
         if ($wordCount >= self::TEXT_GOOD_WORDS) {
             $this->add(
                 $checks,
-                'Gegliederte Absätze',
+                Translations::text('fieldScore.text.paragraphs.label'),
                 $paragraphs >= 2,
                 1.0,
-                'Langer Text in einem Block — in mehrere Absätze gliedern.',
-                $paragraphs . ' Absätze',
+                Translations::text('fieldScore.text.paragraphs.fix'),
+                Translations::text('fieldScore.paragraphCount', $paragraphs),
             );
         }
 
@@ -213,11 +214,11 @@ final class FieldScorer
 
         $this->add(
             $checks,
-            'Keine Satzwiederholungen',
+            Translations::text('fieldScore.text.noRepeats.label'),
             $repeated === 0,
             2.0,
-            $repeated . ' Satz/Sätze wiederholen sich wörtlich — der Text muss echten Inhalt liefern, nicht denselben Satz vervielfachen.',
-            $repeated > 0 ? $repeated . ' Wiederholung(en)' : '',
+            Translations::text('fieldScore.text.noRepeats.fix', $repeated),
+            $repeated > 0 ? Translations::text('fieldScore.repeatCount', $repeated) : '',
         );
 
         // Padding guard #2: lexical variety over the first 150 words.
@@ -230,41 +231,41 @@ final class FieldScorer
 
         $this->add(
             $checks,
-            'Sprachliche Vielfalt',
+            Translations::text('fieldScore.text.variety.label'),
             $variety >= self::MIN_VARIETY,
             1.5,
-            sprintf('Sehr viele Wortwiederholungen (nur %.0f %% verschiedene Wörter) — abwechslungsreich und inhaltlich formulieren.', $variety * 100),
-            sprintf('%.0f %% verschiedene Wörter', $variety * 100),
+            Translations::text('fieldScore.text.variety.fix', $variety * 100),
+            Translations::text('fieldScore.varietyPercent', $variety * 100),
         );
 
         $this->add(
             $checks,
-            'Antwort-zuerst',
+            Translations::text('fieldScore.text.answerFirst.label'),
             $firstWords > 0 && $firstWords <= 25,
             2.0,
-            'Der erste Satz muss das Thema direkt beantworten und höchstens 25 Wörter haben.',
-            $firstWords . ' Wörter im 1. Satz',
+            Translations::text('fieldScore.text.answerFirst.fix'),
+            Translations::text('fieldScore.firstSentenceWords', $firstWords),
         );
 
         $this->add(
             $checks,
-            'Kurze Sätze',
+            Translations::text('fieldScore.text.shortSentences.label'),
             $avgWords <= 18,
             1.5,
-            sprintf('Sätze zu lang (Ø %.0f Wörter) — auf höchstens 18 Wörter je Satz kürzen.', $avgWords),
-            sprintf('Ø %.0f Wörter/Satz', $avgWords),
+            Translations::text('fieldScore.text.shortSentences.fix', $avgWords),
+            Translations::text('fieldScore.avgWordsPerSentence', $avgWords),
         );
 
         $passive = preg_match_all(self::PASSIVE, $plain);
         $this->add(
             $checks,
-            'Aktive Sprache',
+            Translations::text('check.activeVoice.label'),
             $passive / $sentenceCount <= 0.25,
             1.0,
-            'Zu viel Passiv — aktiv umformulieren.',
+            Translations::text('fieldScore.text.tooPassive.fix'),
         );
 
-        $this->add($checks, 'Keine Floskeln', !$this->hasFiller($lower), 1.0, 'Floskeln streichen („In der heutigen Zeit“, „Willkommen“).');
+        $this->add($checks, Translations::text('fieldScore.text.noFiller.label'), !$this->hasFiller($lower), 1.0, Translations::text('fieldScore.text.noFiller.fix'));
 
         // Same two readability signals the page checklist uses, with the same
         // three grades and the same thresholds — otherwise an element scores 100
@@ -273,40 +274,40 @@ final class FieldScorer
         $fleschShown = (int) round($flesch);
         $this->addGraded(
             $checks,
-            'Verständlichkeit',
+            Translations::text('fieldScore.text.readability.label'),
             GermanText::grade($flesch, GermanText::FLESCH_GOOD, GermanText::FLESCH_OK),
             1.0,
-            sprintf('Lesbarkeit %d/100 — kürzere Wörter und Sätze verwenden.', $fleschShown),
-            sprintf('Lesbarkeit %d/100', $fleschShown),
+            Translations::text('fieldScore.text.readability.fix', $fleschShown),
+            Translations::text('fieldScore.readabilityScore', $fleschShown),
         );
 
         $transitions = GermanText::transitionRatio($sentences) * 100;
         $transitionsShown = (int) round($transitions);
         $this->addGraded(
             $checks,
-            'Übergangswörter',
+            Translations::text('fieldScore.text.transitions.label'),
             GermanText::grade($transitions, GermanText::TRANSITION_GOOD, GermanText::TRANSITION_OK),
             1.0,
-            sprintf('Nur %d %% der Sätze mit Verbindungswörtern — „außerdem“, „daher“, „zunächst“ führen den Leser.', $transitionsShown),
-            sprintf('%d %% der Sätze', $transitionsShown),
+            Translations::text('fieldScore.text.transitions.fix', $transitionsShown),
+            Translations::text('fieldScore.transitionsPercent', $transitionsShown),
         );
 
         $this->add(
             $checks,
-            'Erlaubtes HTML',
+            Translations::text('fieldScore.text.allowedHtml.label'),
             preg_match('/<(?!\/?(p|strong|ul|ol|li|em|br)\b)[a-z]/i', $value) !== 1,
             1.0,
-            'Nur <p>, <strong>, <em>, <ul>, <ol>, <li> verwenden.',
+            Translations::text('fieldScore.text.allowedHtml.fix'),
         );
 
         // SOFT — see scoreHeadline(): never force a keyword into a text.
         if ($keyword !== '') {
             $this->add(
                 $checks,
-                'Fokus-Keyword enthalten',
+                Translations::text('fieldScore.keywordPresent.label'),
                 $this->containsKeyword($lower, $keyword),
                 0.0,
-                'Das Fokus-Keyword „' . $keyword . '“ kommt nicht vor — nur einbauen, wenn es thematisch wirklich passt.',
+                Translations::text('fieldScore.keywordMissing.fix', $keyword),
                 '',
                 true,
             );

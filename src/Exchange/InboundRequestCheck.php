@@ -132,9 +132,29 @@ final class InboundRequestCheck
             return InboundRequest::refused('metadata_mismatch');
         }
 
+        // Product identity: the two MACHINE identifiers, byte-for-byte. They are
+        // what stops another product's push being applied here, and the signed
+        // document inside carries its own copy of the slug which
+        // PackageAcceptance checks again before anything is stored.
+        //
+        // The body's "project" is deliberately NOT among them. It is the
+        // catalogue DISPLAY TITLE, which the vendor reads straight off the
+        // product record when it builds a push, and which an administrator may
+        // reword at any time; the protocol states outright that it is sent for
+        // completeness and never compared, for exactly that reason.
+        //
+        // Pinning it here was a silent, total failure of this path. The
+        // catalogue spells this product with a space while the wire has always
+        // carried the compact form, so every vendor-initiated update was
+        // answered 401 — a domain-transfer REVOCATION above all, which meant an
+        // installation that had just lost its licence was never told and kept
+        // serving the product until its lease ran out weeks later. Nothing
+        // surfaced it: activation and refresh build their own body and were
+        // unaffected, the vendor can only observe that the host did not
+        // acknowledge, and every test fixture spelled the title the way this
+        // client did.
         if (
             ($body->action ?? null) !== 'license_update'
-            || ($body->project ?? null) !== PackagePolicy::PROJECT
             || ($body->project_slug ?? null) !== PackagePolicy::PROJECT_SLUG
             || ($body->product_id ?? null) !== PackagePolicy::PRODUCT_ID
         ) {

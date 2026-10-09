@@ -80,7 +80,7 @@ class AnthropicClient extends AbstractHttpClient
             $body = $response->getContent(false);
         } catch (TransportException $e) {
             throw new AiException(
-                'Netzwerkfehler zur Anthropic-API: ' . $e->getMessage(),
+                Translations::text('error.aiNetworkError', 'Anthropic', $e->getMessage()),
                 AiExceptionKind::Transport,
                 previous: $e,
             );
@@ -180,7 +180,7 @@ class AnthropicClient extends AbstractHttpClient
                 ? AiExceptionKind::PromptFiltered
                 : AiExceptionKind::InvalidResponse;
 
-            throw new AiException('Anthropic lieferte keinen Inhalt (stop_reason: ' . $stopReason . ').', $kind);
+            throw new AiException(Translations::text('error.aiNoContent', 'Anthropic', 'stop_reason', $stopReason), $kind);
         }
 
         return new AiResponse(

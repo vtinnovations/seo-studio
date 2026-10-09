@@ -94,13 +94,13 @@ final class PageSeoAnalyzer
         } elseif ($dlen < 100 || $dlen > 160) {
             $checks[] = new SeoCheck('basics', 'warn', Translations::text('check.descriptionLength.label'), Translations::text('check.descriptionLength.hint', $dlen), 1.0, 'meta');
         } else {
-            $checks[] = new SeoCheck('basics', 'good', 'Meta-Beschreibung gesetzt', $dlen . ' Zeichen.', 2.0);
+            $checks[] = new SeoCheck('basics', 'good', Translations::text('check.descriptionSet.label'), Translations::text('check.charactersCount', $dlen), 2.0);
         }
 
         // Exactly one H1.
         $h1 = array_filter($content->headings, static fn ($h): bool => $h->level === 1);
         if (\count($h1) === 1) {
-            $checks[] = new SeoCheck('basics', 'good', 'Genau eine H1', '');
+            $checks[] = new SeoCheck('basics', 'good', Translations::text('check.singleH1.label'), '');
         } elseif (\count($h1) === 0) {
             $checks[] = new SeoCheck('basics', 'warn', Translations::text('check.noH1.label'), Translations::text('check.noH1.hint'), 1.0, 'optimize');
         } else {
@@ -217,9 +217,9 @@ final class PageSeoAnalyzer
         $passive = preg_match_all('/\b(wird|werden|wurde|wurden|geworden)\b/u', mb_strtolower($text));
         $passiveRatio = $passive / $sentenceCount;
         if ($passiveRatio <= 0.25) {
-            $checks[] = new SeoCheck('readability', 'good', 'Aktive Sprache', '');
+            $checks[] = new SeoCheck('readability', 'good', Translations::text('check.activeVoice.label'), '');
         } else {
-            $checks[] = new SeoCheck('readability', 'warn', 'Viel Passiv', 'Aktive Formulierungen wirken direkter.', 1.0, 'optimize');
+            $checks[] = new SeoCheck('readability', 'warn', Translations::text('check.passiveHigh.label'), Translations::text('check.passiveHigh.hint'), 1.0, 'optimize');
         }
 
         // Flesch (German Amstad approximation).

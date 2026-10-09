@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace VTinnovations\SeoStudio\Tests\Exchange;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Request;
 use VTinnovations\SeoStudio\Core\Config\PackagePolicy;
@@ -112,10 +113,68 @@ final class InboundRequestCheckTest extends TestCase
     {
         $check = new InboundRequestCheck($this->testVerifier(), $this->testRing());
 
-        $result = $check->authenticate($this->signedRequest(['project' => 'SomethingElse']), self::NOW);
+        $result = $check->authenticate($this->signedRequest(['project_slug' => 'something-else']), self::NOW);
 
         self::assertFalse($result->authenticated);
         self::assertSame('product_mismatch', $result->category);
+    }
+
+    /**
+     * Every spelling of the display title the vendor catalogue might hold. The
+     * push body's "project" is whatever the product record says, and an
+     * administrator may reword it at any time, so none of these may decide
+     * whether a signed delivery is accepted.
+     *
+     * @return list<array{string}>
+     */
+    public static function catalogueTitles(): array
+    {
+        return [
+            [PackagePolicy::PROJECT],
+            [PackagePolicy::TITLE],
+            ['SEO Studio'],
+            ['seo studio'],
+            [PackagePolicy::PROJECT_SLUG],
+            ['AI SEO Studio (Contao 5)'],
+        ];
+    }
+
+    /**
+     * The regression this guards. While the title was pinned byte-for-byte,
+     * every vendor-initiated update was answered 401 — the domain-transfer
+     * REVOCATION above all, which is the one that decides whether a site that
+     * has just lost its licence stops serving the product.
+     */
+    #[DataProvider('catalogueTitles')]
+    public function testHowTheCatalogueSpellsTheTitleDoesNotDecideAuthentication(string $title): void
+    {
+        $check = new InboundRequestCheck($this->testVerifier(), $this->testRing());
+
+        $result = $check->authenticate($this->signedRequest(['project' => $title]), self::NOW);
+
+        self::assertTrue($result->authenticated, $result->category);
+    }
+
+    /**
+     * Product identity moved entirely onto the two MACHINE identifiers, so both
+     * have to stay byte-for-byte — case included.
+     */
+    public function testTheMachineIdentifiersAreStillMatchedExactly(): void
+    {
+        $check = new InboundRequestCheck($this->testVerifier(), $this->testRing());
+
+        foreach ([
+            ['project_slug' => 'SEO-STUDIO'],
+            ['project_slug' => 'accessplus'],
+            ['product_id' => 'vt-seo-studio-pro'],
+            ['product_id' => 'vt-accessplus'],
+            ['action' => 'license_revoke'],
+        ] as $override) {
+            $result = $check->authenticate($this->signedRequest($override), self::NOW);
+
+            self::assertFalse($result->authenticated, json_encode($override));
+            self::assertSame('product_mismatch', $result->category, json_encode($override));
+        }
     }
 
     public function testUnknownKeyIdIsRefused(): void

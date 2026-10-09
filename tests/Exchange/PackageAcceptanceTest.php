@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace VTinnovations\SeoStudio\Tests\Exchange;
 
 use PHPUnit\Framework\TestCase;
+use VTinnovations\SeoStudio\Core\Config\ProvisioningStore;
 use VTinnovations\SeoStudio\Exchange\PackageAcceptance;
 use VTinnovations\SeoStudio\Tests\PackageFixture;
 
@@ -31,6 +32,24 @@ final class PackageAcceptanceTest extends TestCase
     use PackageFixture;
 
     private const NOW = 1784880600;
+
+    private string $projectDir = '';
+
+    protected function tearDown(): void
+    {
+        if ($this->projectDir !== '' && is_dir($this->projectDir)) {
+            foreach ((array) glob($this->projectDir . '/var/seostudio/provisioning/{,.}*', GLOB_BRACE) as $file) {
+                if (\is_string($file) && is_file($file)) {
+                    @unlink($file);
+                }
+            }
+
+            @rmdir($this->projectDir . '/var/seostudio/provisioning');
+            @rmdir($this->projectDir . '/var/seostudio');
+            @rmdir($this->projectDir . '/var');
+            @rmdir($this->projectDir);
+        }
+    }
 
     /**
      * @return list<array{0: string, 1: string}>
@@ -142,6 +161,17 @@ final class PackageAcceptanceTest extends TestCase
 
     private function acceptance(): PackageAcceptance
     {
-        return new PackageAcceptance($this->testVerifier(), $this->testRing(), $this->inventory());
+        return new PackageAcceptance($this->testVerifier(), $this->testRing(), $this->inventory(), $this->store());
+    }
+
+    /** A throwaway store, so the rollback barrier starts empty per test. */
+    private function store(): ProvisioningStore
+    {
+        if ($this->projectDir === '') {
+            $this->projectDir = sys_get_temp_dir() . '/seo-studio-acceptance-' . bin2hex(random_bytes(6));
+            mkdir($this->projectDir, 0700, true);
+        }
+
+        return new ProvisioningStore($this->projectDir);
     }
 }

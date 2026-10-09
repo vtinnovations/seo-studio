@@ -17,6 +17,7 @@ use Doctrine\DBAL\Connection;
 use VTinnovations\SeoStudio\Core\Ai\AiGateway;
 use VTinnovations\SeoStudio\Core\Ai\PromptBundle;
 use VTinnovations\SeoStudio\Core\Config\ConfigProvider;
+use VTinnovations\SeoStudio\Core\Config\Translations;
 use VTinnovations\SeoStudio\Core\Content\ContentExtractor;
 
 /**
@@ -109,7 +110,7 @@ final class GlossaryGenerator
 
         // Every chunk failed — surface the reason instead of a silent "0".
         if ($created === 0 && $lastError !== null) {
-            throw new \RuntimeException('Generierung fehlgeschlagen: ' . $lastError->getMessage(), 0, $lastError);
+            throw new \RuntimeException(Translations::text('error.generationFailed', $lastError->getMessage()), 0, $lastError);
         }
 
         return ['created' => $created, 'skipped' => $skipped];
@@ -132,12 +133,12 @@ final class GlossaryGenerator
         );
 
         if ($homeId === false) {
-            throw new \RuntimeException('Keine veröffentlichte Startseite gefunden.');
+            throw new \RuntimeException(Translations::text('error.noPublishedHomepage'));
         }
 
         $content = $this->extractor->forPage((int) $homeId);
         if ($content->isEmpty()) {
-            throw new \RuntimeException('Die Startseite hat keinen extrahierbaren Inhalt.');
+            throw new \RuntimeException(Translations::text('error.homepageNoContent'));
         }
 
         $existing = $this->connection->fetchFirstColumn('SELECT term FROM tl_seo_studio_glossary');
@@ -261,7 +262,7 @@ final class GlossaryGenerator
         );
 
         if ($row === false) {
-            throw new \RuntimeException('Glossar-Eintrag nicht gefunden.');
+            throw new \RuntimeException(Translations::text('error.glossaryEntryNotFound'));
         }
 
         $siteName = trim((string) $this->config->get('schemaOrgName', ''));
@@ -299,7 +300,7 @@ final class GlossaryGenerator
         $metaDescription = trim((string) ($json['metaDescription'] ?? ''));
 
         if ($metaTitle === '' || $metaDescription === '') {
-            throw new \RuntimeException('KI-Antwort war unvollständig.');
+            throw new \RuntimeException(Translations::text('error.aiIncompleteResponse'));
         }
 
         return ['metaTitle' => $metaTitle, 'metaDescription' => $metaDescription];

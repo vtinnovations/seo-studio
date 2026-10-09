@@ -16,6 +16,7 @@ use Doctrine\DBAL\Connection;
 use VTinnovations\SeoStudio\Core\Ai\AiGateway;
 use VTinnovations\SeoStudio\Core\Ai\PromptBundle;
 use VTinnovations\SeoStudio\Core\Config\ConfigProvider;
+use VTinnovations\SeoStudio\Core\Config\Translations;
 use VTinnovations\SeoStudio\Core\Content\ContentExtractor;
 
 /**
@@ -48,12 +49,12 @@ final class SummaryGenerator
         );
 
         if ($homeId === false) {
-            throw new \RuntimeException('Keine veröffentlichte Startseite gefunden.');
+            throw new \RuntimeException(Translations::text('error.noPublishedHomepage'));
         }
 
         $content = $this->extractor->forPage((int) $homeId);
         if ($content->isEmpty()) {
-            throw new \RuntimeException('Die Startseite hat keinen extrahierbaren Inhalt.');
+            throw new \RuntimeException(Translations::text('error.homepageNoContent'));
         }
 
         $siteName = trim((string) $this->config->get('schemaOrgName', ''));
@@ -72,7 +73,7 @@ final class SummaryGenerator
 
         $summary = trim($response->content);
         if ($summary === '') {
-            throw new \RuntimeException('KI lieferte keine Zusammenfassung.');
+            throw new \RuntimeException(Translations::text('error.aiNoSummary'));
         }
 
         $this->config->set('llmsTxtSummaryText', $summary);

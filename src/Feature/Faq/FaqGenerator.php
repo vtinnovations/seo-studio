@@ -15,6 +15,7 @@ namespace VTinnovations\SeoStudio\Feature\Faq;
 use Doctrine\DBAL\Connection;
 use VTinnovations\SeoStudio\Core\Ai\AiGateway;
 use VTinnovations\SeoStudio\Core\Ai\PromptBundle;
+use VTinnovations\SeoStudio\Core\Config\Translations;
 use VTinnovations\SeoStudio\Core\Content\ContentExtractor;
 
 /**
@@ -63,7 +64,7 @@ final class FaqGenerator
 
         $content = $this->extractor->forPage($pageId);
         if ($content->isEmpty()) {
-            throw new \RuntimeException('Die Seite hat keinen extrahierbaren Inhalt — FAQ-Generierung braucht Text.');
+            throw new \RuntimeException(Translations::text('error.noExtractableContentFaq'));
         }
 
         $existing = $this->connection->fetchFirstColumn(

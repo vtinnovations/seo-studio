@@ -42,21 +42,23 @@ final class SocialDcaListener
 
         $GLOBALS['TL_CSS']['seo_studio'] = 'bundles/vtinnovationsseostudio/backend.css';
 
-        $GLOBALS['TL_DCA']['tl_page']['fields']['seoSocialTitle'] = [
+        // The SQL columns are defined unconditionally in contao/dca/tl_page.php;
+        // only the editable side is gated here.
+        $fields = &$GLOBALS['TL_DCA']['tl_page']['fields'];
+
+        $fields['seoSocialTitle'] = array_replace($fields['seoSocialTitle'] ?? [], [
             'inputType' => 'text',
             'exclude' => true,
             'eval' => ['maxlength' => 90, 'tl_class' => 'w50', 'decodeEntities' => true],
-            'sql' => "varchar(255) NOT NULL default ''",
-        ];
+        ]);
 
-        $GLOBALS['TL_DCA']['tl_page']['fields']['seoSocialDescription'] = [
+        $fields['seoSocialDescription'] = array_replace($fields['seoSocialDescription'] ?? [], [
             'inputType' => 'text',
             'exclude' => true,
             'eval' => ['maxlength' => 200, 'tl_class' => 'w50', 'decodeEntities' => true],
-            'sql' => "varchar(255) NOT NULL default ''",
-        ];
+        ]);
 
-        $GLOBALS['TL_DCA']['tl_page']['fields']['seoOgImage'] = [
+        $fields['seoOgImage'] = array_replace($fields['seoOgImage'] ?? [], [
             'inputType' => 'fileTree',
             'exclude' => true,
             'eval' => [
@@ -65,8 +67,9 @@ final class SocialDcaListener
                 'extensions' => 'jpg,jpeg,png,webp,gif',
                 'tl_class' => 'clr',
             ],
-            'sql' => 'binary(16) NULL',
-        ];
+        ]);
+
+        unset($fields);
 
         $GLOBALS['TL_DCA']['tl_page']['fields']['seoSocialPreview'] = [
             'input_field_callback' => fn (DataContainer $dc): string => $this->renderer->render((int) $dc->id),

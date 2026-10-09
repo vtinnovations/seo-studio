@@ -88,6 +88,14 @@ final class FixedInventory implements HostInventory
         return $intersection[0];
     }
 
+    public function owns(string $host): bool
+    {
+        $normalized = HostName::normalize($host);
+
+        return $normalized !== null
+            && (\in_array($normalized, $this->configuredHosts(), true) || $normalized === $this->current);
+    }
+
     public function outboundHost(): ?string
     {
         return $this->current ?? ($this->configuredHosts()[0] ?? null);
@@ -297,8 +305,28 @@ function makePackage(array $overrides, string $secret): array
     return ['payload' => base64_encode($bytes), 'envelope' => $sealed, 'bytes' => $bytes];
 }
 
+/**
+ * A package as a ProvisioningRecord, for the checks that need to state what is
+ * already stored rather than just its version number.
+ *
+ * @param array{payload: string, envelope: \stdClass, bytes: string} $package
+ */
+function makeRecord(array $package): ProvisioningRecord
+{
+    /** @var array<string, mixed> $envelope */
+    $envelope = json_decode((string) json_encode($package['envelope']), true);
+    $record = ProvisioningRecord::parse($package['bytes'], $envelope);
+    \assert($record instanceof ProvisioningRecord);
+
+    return $record;
+}
+
+$tempRoot = sys_get_temp_dir() . '/seo-studio-guard-' . bin2hex(random_bytes(6));
+mkdir($tempRoot, 0700, true);
+
 $inventory = new FixedInventory(['example.com'], 'example.com');
-$acceptance = new PackageAcceptance($verifier, $testRing, $inventory);
+$store = new ProvisioningStore($tempRoot);
+$acceptance = new PackageAcceptance($verifier, $testRing, $inventory, $store);
 
 $good = makePackage([], $secret);
 $result = $acceptance->accept($good['payload'], $good['envelope'], 'example.com', null, $now);
@@ -341,13 +369,13 @@ check(
     $acceptance->accept($notMember['payload'], $notMember['envelope'], 'example.com', null, $now)->category === PackageAcceptance::HOST_NOT_MEMBER,
 );
 
-$foreign = new PackageAcceptance($verifier, $testRing, new FixedInventory(['different.example.org'], 'different.example.org'));
+$foreign = new PackageAcceptance($verifier, $testRing, new FixedInventory(['different.example.org'], 'different.example.org'), $store);
 check(
     'a package copied to an installation with no exact intersection fails',
     $foreign->accept($good['payload'], $good['envelope'], 'example.com', null, $now)->category === PackageAcceptance::NO_INTERSECTION,
 );
 
-$apexOnly = new PackageAcceptance($verifier, $testRing, new FixedInventory(['www.example.com'], 'www.example.com'));
+$apexOnly = new PackageAcceptance($verifier, $testRing, new FixedInventory(['www.example.com'], 'www.example.com'), $store);
 $wwwPackage = makePackage(['license_domain' => 'www.example.com'], $secret);
 check(
     'www and apex are separate identities but either can match',
@@ -399,10 +427,24 @@ check(
     $acceptance->accept($lifetime['payload'], $lifetime['envelope'], 'example.com', null, $now)->isAccepted(),
 );
 
-$invalidStatus = makePackage(['validation_status' => 'revoked'], $secret);
+// A "revoked" payload that still lists the target among the authorised hosts is
+// self-contradictory, and the vendor refuses to sign one. If such a packet ever
+// did arrive, the safe reading is the host set — not the status word — because
+// switching a licence off for a host it is still entitled to would be an outage
+// we caused ourselves. This pins that direction.
+$contradictory = makePackage([
+    'license_domain' => 'example.com',
+    'license_domains' => ['example.com'],
+    'validation_status' => 'revoked',
+    'license_version' => 9,
+], $secret);
+
+$contradictoryResult = $acceptance->accept($contradictory['payload'], $contradictory['envelope'], 'example.com', null, $now, true);
 check(
-    'a non-valid validation status is refused',
-    $acceptance->accept($invalidStatus['payload'], $invalidStatus['envelope'], 'example.com', null, $now)->category === PackageAcceptance::STATUS,
+    'a self-contradictory revocation is read by its host set, not its status',
+    $contradictoryResult->isAccepted()
+        && $contradictoryResult->record !== null
+        && $inventory->matchedHost($contradictoryResult->record->domains()) === 'example.com',
 );
 
 $wrongProject = makePackage(['project' => 'SomethingElse'], $secret);
@@ -417,30 +459,104 @@ check(
     $acceptance->accept($legacy['payload'], $legacy['envelope'], 'example.com', null, $now)->category === PackageAcceptance::DOCUMENT_MALFORMED,
 );
 
+$storedAt9 = makeRecord(makePackage(['license_version' => 9], $secret));
+$storedAt7 = makeRecord($good);
+
 check(
     'an older version cannot replace newer stored state',
-    $acceptance->accept($good['payload'], $good['envelope'], 'example.com', 9, $now)->category === PackageAcceptance::ROLLBACK,
+    $acceptance->accept($good['payload'], $good['envelope'], 'example.com', $storedAt9, $now)->category === PackageAcceptance::ROLLBACK,
 );
 check(
     'the same version is acceptable on refresh',
-    $acceptance->accept($good['payload'], $good['envelope'], 'example.com', 7, $now)->isAccepted(),
+    $acceptance->accept($good['payload'], $good['envelope'], 'example.com', $storedAt7, $now)->isAccepted(),
 );
 check(
     'a push must strictly increase the version',
-    $acceptance->accept($good['payload'], $good['envelope'], 'example.com', 7, $now, true)->category === PackageAcceptance::ROLLBACK,
+    $acceptance->accept($good['payload'], $good['envelope'], 'example.com', $storedAt7, $now, true)->category === PackageAcceptance::ROLLBACK,
+);
+
+// ── Withdrawal: the domain-transfer half of the contract ────────────────────
+$withdrawal = makePackage([
+    'license_domain' => 'example.com',
+    'license_domains' => ['newsite.example.org'],
+    'validation_status' => 'revoked',
+    'license_version' => 9,
+], $secret);
+
+check(
+    'a signed revocation is accepted rather than refused as invalid',
+    $acceptance->accept($withdrawal['payload'], $withdrawal['envelope'], 'example.com', null, $now, true)->isAccepted(),
+);
+
+$lastSlotReleased = makePackage([
+    'license_domain' => 'example.com',
+    'license_domains' => [],
+    'validation_status' => 'revoked',
+    'license_version' => 9,
+], $secret);
+
+check(
+    'a revocation releasing the last domain is accepted',
+    $acceptance->accept($lastSlotReleased['payload'], $lastSlotReleased['envelope'], 'example.com', null, $now, true)->isAccepted(),
+);
+
+$emptyGrant = makePackage(['license_domains' => []], $secret);
+check(
+    'an empty signed host set is still refused for a grant',
+    $acceptance->accept($emptyGrant['payload'], $emptyGrant['envelope'], 'example.com', null, $now)->category === PackageAcceptance::HOST_SET_INVALID,
+);
+
+$unservedWithdrawal = new PackageAcceptance(
+    $verifier,
+    $testRing,
+    new FixedInventory(['www.example.com'], 'www.example.com'),
+    $store,
+);
+check(
+    'a revocation for a host this installation does not serve is refused',
+    $unservedWithdrawal->accept($withdrawal['payload'], $withdrawal['envelope'], 'example.com', null, $now, true)->category === PackageAcceptance::TARGET_NOT_SERVED,
+);
+
+$unknownStatus = makePackage(['validation_status' => 'suspended'], $secret);
+check(
+    'an unrecognised validation status is refused rather than guessed at',
+    $acceptance->accept($unknownStatus['payload'], $unknownStatus['envelope'], 'example.com', null, $now)->category === PackageAcceptance::STATUS,
+);
+
+// ── The rollback barrier survives both a restore and a removal ──────────────
+$barrierRoot = sys_get_temp_dir() . '/seo-studio-guard-floor-' . bin2hex(random_bytes(6));
+mkdir($barrierRoot, 0700, true);
+$barrierStore = new ProvisioningStore($barrierRoot);
+$barrierAcceptance = new PackageAcceptance($verifier, $testRing, $inventory, $barrierStore);
+$licenceKey = (string) makeRecord($good)->licenceKey();
+
+$barrierStore->raise($licenceKey, 9);
+check(
+    'a restored pre-transfer record is refused by the rollback barrier',
+    $barrierAcceptance->accept($good['payload'], $good['envelope'], 'example.com', null, $now)->category === PackageAcceptance::SUPERSEDED,
+);
+
+$barrierStore->remove();
+check(
+    'removing the licence does not forget the rollback barrier',
+    $barrierStore->floor($licenceKey) === 9,
+);
+check(
+    'the barrier is scoped to one licence key, so a replacement still activates',
+    $barrierStore->floor('SS-PRO-REPLACEMENT-0001') === 0,
 );
 
 $forgedRing = new TrustAnchors([new TrustAnchor('test-key', 'ed25519', sodium_crypto_sign_publickey(sodium_crypto_sign_keypair()), [
     TrustAnchor::PURPOSE_DOCUMENT,
     TrustAnchor::PURPOSE_ENVELOPE,
 ], 0, null)]);
-$wrongKeyAcceptance = new PackageAcceptance(new SignatureVerifier($forgedRing), $forgedRing, $inventory);
+$wrongKeyAcceptance = new PackageAcceptance(new SignatureVerifier($forgedRing), $forgedRing, $inventory, $store);
 check(
     'a package signed by another key is refused',
     $wrongKeyAcceptance->accept($good['payload'], $good['envelope'], 'example.com', null, $now)->category === PackageAcceptance::ENVELOPE_SIGNATURE,
 );
 
-$emptyRingAcceptance = new PackageAcceptance(new SignatureVerifier($emptyRing), $emptyRing, $inventory);
+$emptyRingAcceptance = new PackageAcceptance(new SignatureVerifier($emptyRing), $emptyRing, $inventory, $store);
 check(
     'an empty key ring fails closed instead of trusting the digest',
     $emptyRingAcceptance->accept($good['payload'], $good['envelope'], 'example.com', null, $now)->category === TrustAnchors::CATEGORY_EMPTY,
@@ -449,10 +565,8 @@ check(
 // ─────────────────────────────────────────────────────────────────────────────
 // 7b. Atomic store + entitlement transitions
 // ─────────────────────────────────────────────────────────────────────────────
-$tempRoot = sys_get_temp_dir() . '/seo-studio-guard-' . bin2hex(random_bytes(6));
-mkdir($tempRoot, 0700, true);
-
-$store = new ProvisioningStore($tempRoot);
+// $tempRoot / $store were created before section 7 because the acceptance
+// pipeline now consults the store for the rollback barrier.
 $entitlement = new EntitlementEvaluator($store, $acceptance, $inventory);
 
 check('nothing stored means unlicensed', $entitlement->evaluate($now)->status === EntitlementState::ABSENT);
@@ -705,11 +819,16 @@ $exempt = [
 ];
 
 $pending = [
+    // Dead code only (never rendered — see DashboardModule::EXAMPLES and the
+    // unused $body in renderExplainers()); the live paths already go through
+    // Translations::text(). Left in place because removing it is a cleanup,
+    // not a localisation fix.
     'src/Controller/DashboardModule.php' => 33,
-    'src/Controller/AuditModule.php' => 29,
-    'src/Controller/GenerateModule.php' => 22,
-    'src/Controller/SettingsModule.php' => 19,
-    'src/Feature/Optimize/FieldScorer.php' => 31,
+    // The FILLER word list — German content-analysis data, not interface text.
+    'src/Feature/Optimize/FieldScorer.php' => 1,
+    // Unused $fallback literals in the local $t()/$traw() helpers — the actual
+    // displayed text always comes from the (already dynamic) TL_LANG key.
+    'src/Controller/SettingsModule.php' => 17,
 ];
 
 $literals = [];

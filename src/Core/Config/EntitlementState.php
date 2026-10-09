@@ -43,6 +43,23 @@ final class EntitlementState
     public const NEEDS_REFRESH = 'unlicensed_needs_refresh';
 
     /**
+     * The licence was moved to another installation.
+     *
+     * A distinct status from NO_HOST_MATCH even though both mean "no configured
+     * host is authorised", because the two need opposite advice: NO_HOST_MATCH
+     * says "check your domain configuration", this one says "this licence now
+     * lives somewhere else".
+     */
+    public const REVOKED = 'unlicensed_revoked';
+
+    /**
+     * Entitlement could not be confirmed with the vendor for the whole lease
+     * plus the whole grace period, so it has run out. Distinct from EXPIRED,
+     * which is the licence's own term ending.
+     */
+    public const LEASE_EXPIRED = 'unlicensed_lease_expired';
+
+    /**
      * @param list<string> $features
      * @param list<string> $signedHosts
      * @param list<string> $configuredHosts

@@ -14,6 +14,7 @@ namespace VTinnovations\SeoStudio\Feature\InlinePanel\Adapter;
 
 use VTinnovations\SeoStudio\Core\Ai\AiGateway;
 use VTinnovations\SeoStudio\Core\Ai\PromptBundle;
+use VTinnovations\SeoStudio\Core\Config\Translations;
 use VTinnovations\SeoStudio\Feature\InlinePanel\AdapterInterface;
 use VTinnovations\SeoStudio\Feature\InlinePanel\PanelResult;
 use VTinnovations\SeoStudio\Feature\InlinePanel\VerdictCache;
@@ -80,7 +81,7 @@ abstract class AbstractAdapter implements AdapterInterface
         $result = PanelResult::fromArray($json);
 
         if ($result->reason === '') {
-            $result = new PanelResult(50, 'KI-Antwort unvollständig — bitte erneut prüfen.', []);
+            $result = new PanelResult(50, Translations::text('error.aiIncompleteAnswer'), []);
         } else {
             $this->cache->put($cacheKey, $result);
         }

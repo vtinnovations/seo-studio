@@ -275,6 +275,11 @@ $inventory = new class implements HostInventory {
         return 'example.com';
     }
 
+    public function owns(string $host): bool
+    {
+        return \in_array(HostName::normalize($host), $this->configuredHosts(), true);
+    }
+
     public function reset(): void
     {
     }

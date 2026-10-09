@@ -372,7 +372,7 @@ final class DashboardModule
             }
 
             $pageId = (int) ($row['pageId'] ?? 0);
-            $title = trim((string) ($row['title'] ?? '')) ?: 'Seite ' . $pageId;
+            $title = trim((string) ($row['title'] ?? '')) ?: $this->transf('dash.untitledPage', $pageId);
             if (($titleCount[$title] ?? 0) > 1) {
                 $title .= ' (ID ' . $pageId . ')';
             }

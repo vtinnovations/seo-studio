@@ -50,7 +50,7 @@ final class ConnectionTester
         try {
             $client = $this->factory->default();
         } catch (\RuntimeException $e) {
-            return TestResult::failure('Konfigurationsfehler: ' . $e->getMessage());
+            return TestResult::failure(Translations::text('error.configurationError', $e->getMessage()));
         }
 
         $bundle = new PromptBundle(
@@ -68,11 +68,11 @@ final class ConnectionTester
             // Log kind only, never the key/body (the message is already scrubbed).
             $this->logger->warning('seo-studio connection test failed', ['kind' => $e->kind->value]);
 
-            return TestResult::failure('Verbindung fehlgeschlagen: ' . $e->getMessage());
+            return TestResult::failure(Translations::text('error.connectionFailed', $e->getMessage()));
         }
 
-        return TestResult::success(sprintf(
-            'Verbindung ok (%s / %s, %d ms).',
+        return TestResult::success(Translations::text(
+            'settingsConnectionOk',
             $response->provider,
             $response->model,
             $response->durationMs,

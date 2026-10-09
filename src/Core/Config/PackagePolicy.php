@@ -74,6 +74,29 @@ final class PackagePolicy
     /** Longest licence key accepted from an administrator form. */
     public const KEY_MAX_LENGTH = 191;
 
+    /**
+     * How long a verified licence may run before it has to be confirmed with
+     * the vendor again, and how much longer it may keep running while those
+     * confirmations are failing. 30 days, then 14 days of grace.
+     *
+     * WHY A LEASE EXISTS AT ALL. A vendor push closes the domain-transfer hole
+     * only when the push arrives. An installation that has moved on can be
+     * offline, behind changed DNS, firewalled, or deliberately dropping our
+     * requests — and deliberately dropping them is exactly what someone
+     * exploiting the hole does. So the push cannot be the enforcement; the
+     * enforcement is that entitlement is a LEASE which has to be renewed, and
+     * an installation that is never reachable runs out of it on its own.
+     *
+     * Deliberately compile-time constants and NOT container parameters: the
+     * site owner is who this guard is against, and a parameter would let them
+     * set the lease to a century. The signed license_refresh_required_at /
+     * license_grace_until fields win outright when the vendor sends them, so
+     * these two numbers are the fallback for a server that does not yet.
+     */
+    public const LEASE_SECONDS = 2592000;
+
+    public const GRACE_SECONDS = 1209600;
+
     private function __construct()
     {
     }
@@ -81,6 +104,39 @@ final class PackagePolicy
     public static function acceptsPackage(string $package): bool
     {
         return \in_array($package, self::ACCEPTED_PACKAGES, true);
+    }
+
+    /**
+     * When this record has to be confirmed with the vendor again.
+     *
+     * The signed deadline when the vendor states one, otherwise LEASE_SECONDS
+     * after the licence was last confirmed. Either way the answer comes out of
+     * the SIGNED document — never out of a file the site owner can edit, which
+     * is what made the previous generation of these clients trivially
+     * defeatable.
+     */
+    public static function recheckDueAt(ProvisioningRecord $record): int
+    {
+        return $record->refreshRequiredAt() ?? ($record->leaseAnchor() + self::LEASE_SECONDS);
+    }
+
+    /**
+     * The hard cutoff. Past this, protected entitlement fails closed until a
+     * newer valid signed state is obtained.
+     *
+     * Reaching it means every re-check has failed for the whole lease plus the
+     * whole grace period, because each success restamps license_verified_at and
+     * moves both deadlines forward.
+     */
+    public static function graceEndsAt(ProvisioningRecord $record): int
+    {
+        return $record->graceUntil() ?? (self::recheckDueAt($record) + self::GRACE_SECONDS);
+    }
+
+    /** True when stale entitlement must no longer be honoured. */
+    public static function leaseHasLapsed(ProvisioningRecord $record, int $now): bool
+    {
+        return $now > self::graceEndsAt($record);
     }
 
     /**

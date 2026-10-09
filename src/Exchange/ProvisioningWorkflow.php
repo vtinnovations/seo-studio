@@ -45,6 +45,22 @@ final class ProvisioningWorkflow
 
     public const NOTHING_STORED = 'nothing_stored';
 
+    /** The lease has not run out yet, or the throttle is still holding. */
+    public const NOT_DUE = 'not_due';
+
+    /** Withdrawn: the unattended re-check deliberately stops here. */
+    public const WITHDRAWN = 'withdrawn';
+
+    /** No configured host is authorised, so re-binding is not ours to decide. */
+    public const NO_HOST_MATCH = 'no_host_match';
+
+    /**
+     * Shortest interval between two unattended attempts. Separate from the
+     * lease: it stops an unreachable vendor turning an hourly cron into a
+     * per-request retry storm.
+     */
+    private const ATTEMPT_THROTTLE = 3600;
+
     public function __construct(
         private readonly VerifyClient $client,
         private readonly PackageAcceptance $acceptance,
@@ -76,7 +92,7 @@ final class ProvisioningWorkflow
         return $this->store->transaction(function () use ($key, $domain, $now): string {
             $outcome = $this->client->exchange(VerifyClient::ACTION_ACTIVATE, $key, $domain, null, $now);
 
-            return $this->consume($outcome, $key, $domain, $now, false, 'activate');
+            return $this->consume($outcome, $domain, $now, false, 'activate');
         });
     }
 
@@ -116,8 +132,75 @@ final class ProvisioningWorkflow
                 $now,
             );
 
-            return $this->consume($outcome, $key, $domain, $now, false, 'refresh');
+            return $this->consume($outcome, $domain, $now, false, 'refresh');
         });
+    }
+
+    /**
+     * The UNATTENDED re-check, driven by the hourly cron.
+     *
+     * This is the half that actually enforces a domain transfer. A vendor push
+     * is best-effort and cannot be relied on: the installation that lost the
+     * licence may be offline, behind changed DNS, firewalled, or deliberately
+     * dropping our requests, and dropping them is precisely what somebody
+     * exploiting the transfer hole does. Entitlement is therefore a lease, and
+     * this is what renews it — an installation that is never reachable runs out
+     * on its own, with nobody having to click anything.
+     *
+     * Three conditions stop it pulling, and each one is a hole if it is missing:
+     *
+     *   withdrawn  — the vendor's /api/v1/verify binds the domain it is asked
+     *                about on a REFRESH, not only on an activation. A released
+     *                host that kept polling would therefore re-bind itself and
+     *                silently re-license, defeating the revocation it had
+     *                already accepted. Only a vendor push or an administrator
+     *                pressing "Update licence" may bring it back.
+     *   superseded — the same hole reached through a restored backup: the stored
+     *                record verifies, but the rollback barrier has moved past
+     *                it, so it is a withdrawn state wearing an older file's
+     *                clothes.
+     *   no host    — when no configured host is authorised any more, asking the
+     *                vendor about whatever host this installation now serves
+     *                would make re-binding an unattended decision. That is an
+     *                administrator's call.
+     */
+    public function refreshIfDue(?int $now = null): string
+    {
+        $now ??= time();
+
+        // A future value counts as "never attempted", so forward-dating the
+        // marker cannot switch the re-check off — it only brings it forward.
+        $attempted = $this->store->lastAttempt();
+        if ($attempted > 0 && $attempted <= $now && $now - $attempted < self::ATTEMPT_THROTTLE) {
+            return self::NOT_DUE;
+        }
+
+        $record = $this->store->load();
+        if ($record === null) {
+            return self::NOTHING_STORED;
+        }
+
+        if ($record->isWithdrawal()) {
+            return self::WITHDRAWN;
+        }
+
+        if ($record->version() < $this->store->floor($record->licenceKey())) {
+            return self::WITHDRAWN;
+        }
+
+        if ($this->inventory->matchedHost($record->domains()) === null) {
+            return self::NO_HOST_MATCH;
+        }
+
+        if ($now < PackagePolicy::recheckDueAt($record)) {
+            return self::NOT_DUE;
+        }
+
+        // Stamped BEFORE the call, so a vendor endpoint that hangs cannot turn
+        // the throttle into a no-op.
+        $this->store->markAttempt($now);
+
+        return $this->refresh(null, $now);
     }
 
     /**
@@ -168,7 +251,7 @@ final class ProvisioningWorkflow
                 $payload,
                 $envelope,
                 $request->domain,
-                $stored?->version(),
+                $stored,
                 $now,
                 true,
             );
@@ -207,7 +290,6 @@ final class ProvisioningWorkflow
 
     private function consume(
         VerifyOutcome $outcome,
-        string $licenceKey,
         string $domain,
         int $now,
         bool $requireNewer,
@@ -220,22 +302,14 @@ final class ProvisioningWorkflow
 
         \assert($outcome->payloadB64 !== null && $outcome->envelope !== null);
 
-        $stored = $this->store->load();
-
-        // license_version counts within ONE licence, so only a package for the
-        // SAME key can be a rollback of what is stored. An administrator
-        // entering a different key (a replacement purchase, a moved site, an
-        // upgraded subscription) gets a freshly issued package whose own
-        // counter legitimately starts lower than the outgoing licence's — that
-        // is a supersession, not a downgrade, and comparing the two versions
-        // rejected genuine activations the vendor had already approved.
-        $supersedesStored = $stored !== null && hash_equals($stored->licenceKey(), $licenceKey);
-
+        // The ordering rule is applied against the whole stored record, which
+        // is what lets it scope the comparison to the same licence key (see
+        // PackageAcceptance::movesForward()).
         $result = $this->acceptance->accept(
             $outcome->payloadB64,
             $outcome->envelope,
             $domain,
-            $supersedesStored ? $stored->version() : null,
+            $this->store->load(),
             $now,
             $requireNewer,
         );
@@ -272,7 +346,7 @@ final class ProvisioningWorkflow
     /**
      * Atomic swap plus a full post-write re-verification: the bytes that end up
      * on disk must pass exactly the same pipeline again, otherwise the previous
-     * pair is rolled back.
+     * pair is rolled back. A successful swap then raises the rollback barrier.
      */
     private function persist(ProvisioningRecord $record, int $now): bool
     {
@@ -281,6 +355,14 @@ final class ProvisioningWorkflow
             $record->envelope(),
             fn (ProvisioningRecord $candidate): bool => $this->acceptance->checkStored($candidate, $now)->isAccepted(),
         );
+
+        if ($activated) {
+            // Raise the rollback barrier for this licence, withdrawals
+            // included — a withdrawal's version is precisely the number that
+            // has to make the older, still perfectly signed licence file on the
+            // administrator's backup drive worthless.
+            $this->store->raise($record->licenceKey(), $record->version());
+        }
 
         // Cached entitlement must never survive a state change, in either
         // direction.

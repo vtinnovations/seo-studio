@@ -18,6 +18,7 @@ use Symfony\Component\HttpFoundation\Response;
 use VTinnovations\SeoStudio\Exchange\InboundRequestCheck;
 use VTinnovations\SeoStudio\Exchange\Journal;
 use VTinnovations\SeoStudio\Exchange\OperationLog;
+use VTinnovations\SeoStudio\Exchange\PackageAcceptance;
 use VTinnovations\SeoStudio\Exchange\ProvisioningWorkflow;
 
 /**
@@ -121,7 +122,19 @@ final class ExchangeCallbackController
         if ($outcome['status'] !== ProvisioningWorkflow::OK) {
             $this->journal->complete($authenticated->requestId, 'rejected', 0, $now);
 
-            $conflict = \in_array($outcome['status'], ['version_rollback', 'envelope_document_mismatch'], true);
+            // A version conflict is a conflict however it was detected: the
+            // stored record refusing an older push, the rollback barrier
+            // refusing a restored backup, or an envelope disagreeing with its
+            // document. Everything else is unprocessable content.
+            $conflict = \in_array(
+                $outcome['status'],
+                [
+                    PackageAcceptance::ROLLBACK,
+                    PackageAcceptance::SUPERSEDED,
+                    PackageAcceptance::ENVELOPE_MISMATCH,
+                ],
+                true,
+            );
 
             return new JsonResponse(
                 ['status' => 'rejected', 'request_id' => $authenticated->requestId],

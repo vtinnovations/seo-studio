@@ -135,7 +135,7 @@ final class ProvisioningWorkflowTest extends TestCase
     private function workflow(ProvisioningStore $store, array $package): ProvisioningWorkflow
     {
         $inventory = $this->inventory(['example.com'], 'example.com');
-        $acceptance = new PackageAcceptance($this->testVerifier(), $this->testRing(), $inventory);
+        $acceptance = new PackageAcceptance($this->testVerifier(), $this->testRing(), $inventory, $store);
         $log = new OperationLog(new NullLogger());
 
         $client = new MockHttpClient(

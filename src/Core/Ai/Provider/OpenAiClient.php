@@ -75,7 +75,7 @@ class OpenAiClient extends AbstractHttpClient
             $body = $response->getContent(false);
         } catch (TransportException $e) {
             throw new AiException(
-                'Netzwerkfehler zur OpenAI-API: ' . $e->getMessage(),
+                Translations::text('error.aiNetworkError', 'OpenAI', $e->getMessage()),
                 AiExceptionKind::Transport,
                 previous: $e,
             );
@@ -145,7 +145,7 @@ class OpenAiClient extends AbstractHttpClient
                 ? AiExceptionKind::PromptFiltered
                 : AiExceptionKind::InvalidResponse;
 
-            throw new AiException('OpenAI lieferte keinen Inhalt (finish_reason: ' . $finishReason . ').', $kind);
+            throw new AiException(Translations::text('error.aiNoContent', 'OpenAI', 'finish_reason', $finishReason), $kind);
         }
 
         return new AiResponse(

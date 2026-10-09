@@ -44,14 +44,17 @@ final class PageScoreDcaListener
         // Load the badge/checklist styles on every tl_page view (tree + edit form).
         $GLOBALS['TL_CSS']['seo_studio'] = 'bundles/vtinnovationsseostudio/backend.css';
 
-        // Focus keyword field (+ SQL column → auto-migrated).
-        $GLOBALS['TL_DCA']['tl_page']['fields']['seoFocusKeyword'] = [
-            'inputType' => 'text',
-            'exclude' => true,
-            'search' => true,
-            'eval' => ['maxlength' => 128, 'tl_class' => 'w50', 'decodeEntities' => true],
-            'sql' => "varchar(128) NOT NULL default ''",
-        ];
+        // Focus keyword field. Its SQL column is defined unconditionally in
+        // contao/dca/tl_page.php; only the editable side is gated here.
+        $GLOBALS['TL_DCA']['tl_page']['fields']['seoFocusKeyword'] = array_replace(
+            $GLOBALS['TL_DCA']['tl_page']['fields']['seoFocusKeyword'] ?? [],
+            [
+                'inputType' => 'text',
+                'exclude' => true,
+                'search' => true,
+                'eval' => ['maxlength' => 128, 'tl_class' => 'w50', 'decodeEntities' => true],
+            ],
+        );
 
         // Virtual checklist panel.
         $GLOBALS['TL_DCA']['tl_page']['fields']['seoScorePanel'] = [

@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace VTinnovations\SeoStudio\Feature\InlinePanel\Adapter;
 
 use VTinnovations\SeoStudio\Core\Ai\AiGateway;
+use VTinnovations\SeoStudio\Core\Config\Translations;
 use VTinnovations\SeoStudio\Feature\InlinePanel\ContextResolver;
 use VTinnovations\SeoStudio\Feature\InlinePanel\PanelResult;
 use VTinnovations\SeoStudio\Feature\InlinePanel\VerdictCache;
@@ -54,7 +55,7 @@ final class LinkTextAdapter extends AbstractAdapter
         $url = (string) ($row['url'] ?? '');
 
         if ($value === '') {
-            return new PanelResult(0, 'Kein Linktext gesetzt — Screenreader und KI-Crawler sehen nur die URL.', []);
+            return new PanelResult(0, Translations::text('optimize.linkText.empty'), []);
         }
 
         $normalized = mb_strtolower(trim($value, " .!…»«\"'"));
@@ -62,7 +63,7 @@ final class LinkTextAdapter extends AbstractAdapter
 
         if (!$isVague && mb_strlen($value) >= 8) {
             // Deterministically fine — cheap LLM polish only for vague/short texts.
-            return new PanelResult(90, 'Aussagekräftiger Linktext.', []);
+            return new PanelResult(90, Translations::text('optimize.linkText.good'), []);
         }
 
         $pageTitle = $this->context->pageTitle($this->context->pageIdForContentElement($rowId));
@@ -82,7 +83,7 @@ final class LinkTextAdapter extends AbstractAdapter
         if ($isVague) {
             return new PanelResult(
                 min($result->score, 25),
-                'Floskel-Linktext („' . $value . '“) — beschreibt das Linkziel nicht.',
+                Translations::text('optimize.linkText.vague', $value),
                 $result->alternatives,
                 $result->fromCache,
             );

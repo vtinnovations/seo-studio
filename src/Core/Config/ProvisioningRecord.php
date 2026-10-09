@@ -30,6 +30,30 @@ final class ProvisioningRecord
 {
     public const SCHEMA_VERSION = 2;
 
+    /** The installation is entitled to what this record describes. */
+    public const STATUS_VALID = 'valid';
+
+    /**
+     * The licence was moved away from this host: an authoritative WITHDRAWAL,
+     * not a failed verification. The record still carries the licence's real
+     * package, term and key — a revocation says where the licence may run, not
+     * whether the customer still owns it.
+     */
+    public const STATUS_REVOKED = 'revoked';
+
+    /** The licence's term ended. Licence-wide, unlike a revocation. */
+    public const STATUS_EXPIRED = 'expired';
+
+    /**
+     * Every status this client understands. An unrecognised value is refused
+     * rather than guessed at in either direction: guessing "entitled" would
+     * grant on a state we cannot read, and guessing "withdrawn" would take a
+     * paying customer's site down on a field we simply do not know yet.
+     *
+     * @var list<string>
+     */
+    public const STATUSES = [self::STATUS_VALID, self::STATUS_REVOKED, self::STATUS_EXPIRED];
+
     /**
      * @param array<string, mixed> $document
      * @param array<string, mixed> $envelope
@@ -208,6 +232,73 @@ final class ProvisioningRecord
         return (string) $this->document['validation_status'];
     }
 
+    /** True when this record grants entitlement rather than withdrawing it. */
+    public function isPositive(): bool
+    {
+        return $this->validationStatus() === self::STATUS_VALID;
+    }
+
+    public function isRevoked(): bool
+    {
+        return $this->validationStatus() === self::STATUS_REVOKED;
+    }
+
+    /**
+     * An authoritative negative state of either kind.
+     *
+     * Both are authentic vendor statements and both are applied as state
+     * changes; they differ only in scope. A revocation is about ONE host (the
+     * signed host set says which hosts remain), an expiry is about the whole
+     * licence.
+     */
+    public function isWithdrawal(): bool
+    {
+        return $this->isRevoked() || $this->validationStatus() === self::STATUS_EXPIRED;
+    }
+
+    public function hasKnownStatus(): bool
+    {
+        return \in_array($this->validationStatus(), self::STATUSES, true);
+    }
+
+    /**
+     * Signed re-check deadline, when the vendor states one.
+     *
+     * Optional in the schema: no released server emits it yet, so a record
+     * without it falls back to a locally fixed lease anchored on the signed
+     * license_verified_at (see PackagePolicy). Reading it from the signed
+     * document rather than from configuration is the whole point — the guard
+     * exists against the site owner, who can edit anything unsigned.
+     */
+    public function refreshRequiredAt(): ?int
+    {
+        return $this->optionalTimestamp('license_refresh_required_at');
+    }
+
+    /** Signed hard cutoff after which stale entitlement must fail closed. */
+    public function graceUntil(): ?int
+    {
+        return $this->optionalTimestamp('license_grace_until');
+    }
+
+    /**
+     * The timestamp the lease is measured from: when the vendor last confirmed
+     * this licence, or failing that when it was issued.
+     */
+    public function leaseAnchor(): int
+    {
+        $verified = $this->verifiedAt();
+
+        return $verified > 0 ? $verified : $this->issuedAt();
+    }
+
+    private function optionalTimestamp(string $field): ?int
+    {
+        $value = $this->document[$field] ?? null;
+
+        return \is_int($value) && $value > 0 ? $value : null;
+    }
+
     public function signature(): string
     {
         return (string) $this->document['signature'];
@@ -314,7 +405,12 @@ final class ProvisioningRecord
             return false;
         }
 
-        return self::isStringList($document['license_domains'] ?? null)
+        // An EMPTY license_domains is a legal shape, not a malformed document:
+        // it is what the vendor signs when the last domain slot was released.
+        // Whether an empty set may AUTHORISE anything is a policy question and
+        // is answered in the acceptance pipeline, where a positive state still
+        // requires a non-empty canonical set.
+        return self::isStringList($document['license_domains'] ?? null, true)
             && self::isStringList($document['license_features'] ?? null, true);
     }
 

@@ -66,18 +66,18 @@ final class AuditModule
                     $calculator = $container->get(GeoScoreCalculator::class);
                     $withLlm = $request->request->getBoolean('withLlm');
                     $done = $calculator->computeBatch(10, $withLlm);
-                    Message::addConfirmation(sprintf('%d Seite(n) bewertet%s.', $done, $withLlm ? ' (mit KI-Check)' : ' (deterministisch)'));
+                    Message::addConfirmation($this->transf('audit.scoresComputed', $done, $withLlm ? $this->trans('audit.scoresWithLlm') : $this->trans('audit.scoresDeterministic')));
                 } elseif ($action === 'imagewizard' && $featureState->isEnabled('images')) {
                     /** @var ImageSizeWizard $wizard */
                     $wizard = $container->get(ImageSizeWizard::class);
                     $result = $wizard->apply();
-                    Message::addConfirmation(sprintf('Bildgröße „SEO Studio Responsiv“ (ID %d) %d Element(en) zugewiesen.', $result['presetId'], $result['assigned']));
+                    Message::addConfirmation($this->transf('audit.imageSizeAssigned', $result['presetId'], $result['assigned']));
                 } elseif ($action === 'robots' && $featureState->isEnabled('audit')) {
                     $results = $auditor->run();
-                    Message::addConfirmation(sprintf('Crawler-Prüfung abgeschlossen: %d Domain(s).', \count($results)));
+                    Message::addConfirmation($this->transf('audit.crawlerCheckDone', \count($results)));
                 }
             } catch (\Throwable $e) {
-                Message::addError('Aktion fehlgeschlagen: ' . $e->getMessage());
+                Message::addError($this->trans('error.actionFailedPrefix') . $e->getMessage());
             }
 
             Controller::redirect($request->getRequestUri());
@@ -89,7 +89,7 @@ final class AuditModule
     private function runStructureAudit(int $pageId, mixed $container): void
     {
         if ($pageId <= 0) {
-            Message::addError('Bitte eine Seite auswählen.');
+            Message::addError($this->trans('error.pageNotSelected'));
 
             return;
         }
@@ -116,7 +116,7 @@ final class AuditModule
         }
 
         $config->set('lastStructureAudit', $result);
-        Message::addConfirmation('Struktur-Audit abgeschlossen.');
+        Message::addConfirmation($this->trans('audit.structureDone'));
     }
 
     private function render(RobotsAuditor $auditor, FeatureState $featureState, mixed $container): string
@@ -141,28 +141,26 @@ final class AuditModule
         $tabs = [];
 
         if ($audit) {
-            $tabs[] = ['crawler', 'KI-Crawler', $this->renderCrawler($e, $tokenValue, $auditor)];
-            $tabs[] = ['structure', 'Struktur', $this->renderStructureSection($e, $tokenValue, $container, $scopeIds)];
-            $tabs[] = ['duplicates', 'Duplikate', $this->renderDuplicatesSection($e, $container)];
+            $tabs[] = ['crawler', $this->trans('audit.tabCrawler'), $this->renderCrawler($e, $tokenValue, $auditor)];
+            $tabs[] = ['structure', $this->trans('audit.tabStructure'), $this->renderStructureSection($e, $tokenValue, $container, $scopeIds)];
+            $tabs[] = ['duplicates', $this->trans('audit.tabDuplicates'), $this->renderDuplicatesSection($e, $container)];
         }
         if ($featureState->isEnabled('geoScore')) {
-            $tabs[] = ['geoscore', 'SEO/GEO/AEO-Score', $this->renderGeoScore($e, $tokenValue, $featureState, $container, $scopeIds)];
+            $tabs[] = ['geoscore', $this->trans('audit.tabGeoScore'), $this->renderGeoScore($e, $tokenValue, $featureState, $container, $scopeIds)];
         }
         if ($featureState->isEnabled('freshness')) {
-            $tabs[] = ['freshness', 'Aktualität', $this->renderFreshness($e, $featureState, $container, $scopeIds)];
+            $tabs[] = ['freshness', $this->trans('audit.tabFreshness'), $this->renderFreshness($e, $featureState, $container, $scopeIds)];
         }
         if ($featureState->isEnabled('images')) {
-            $tabs[] = ['images', 'Bilder', $this->renderImages($e, $tokenValue, $featureState, $container)];
+            $tabs[] = ['images', $this->trans('audit.tabImages'), $this->renderImages($e, $tokenValue, $featureState, $container)];
         }
 
-        $intro = '<p>Prüfungen und Bewertungen deiner Website. Nichts wird verändert — du bekommst nur Berichte und '
-            . 'Korrektur-Empfehlungen. Der GEO-Score und der Bild-Assistent sind die einzigen Aktionen mit Schreibzugriff '
-            . '(jeweils per Klick).</p>';
+        $intro = $this->trans('audit.intro');
 
         $tabsHtml = $this->renderTabs('analyse', $tabs);
         $body = $tabsHtml !== ''
             ? $this->renderRootFilter($e, $rootScope, $rootId, 'seo_analyse') . $tabsHtml
-            : '<p class="tl_info">Alle Analyse-Funktionen sind deaktiviert (SEO Studio → Einstellungen).</p>';
+            : '<p class="tl_info">' . $this->trans('audit.disabledNotice') . '</p>';
 
         return $this->renderShell($intro, $body);
     }
@@ -177,28 +175,27 @@ final class AuditModule
             . '<input type="hidden" name="REQUEST_TOKEN" value="' . $e($token) . '">'
             . '<input type="hidden" name="seoStudioAction" value="robots">'
             . '<fieldset class="tl_tbox block">'
-            . '<legend>KI-Crawler-Audit (robots.txt)</legend>'
-            . '<p>Prüft für jede Domain, ob KI-Crawler (ChatGPT, Claude, Perplexity, Gemini …) die Website lesen dürfen. '
-            . 'Blockierte Crawler bedeuten: die Website kann in KI-Antworten nicht zitiert werden.</p>'
-            . ($cacheTime > 0 ? '<p class="tl_info">Letzte Prüfung: ' . $e(date('d.m.Y H:i', $cacheTime)) . '</p>' : '')
-            . '<div class="tl_submit_container" style="margin:8px 0 16px"><button type="submit" class="tl_submit">Jetzt prüfen</button></div>'
+            . '<legend>' . $e($this->trans('audit.crawlerLegend')) . '</legend>'
+            . '<p>' . $e($this->trans('audit.crawlerHelp')) . '</p>'
+            . ($cacheTime > 0 ? '<p class="tl_info">' . $e($this->transf('audit.crawlerLastChecked', date('d.m.Y H:i', $cacheTime))) . '</p>' : '')
+            . '<div class="tl_submit_container" style="margin:8px 0 16px"><button type="submit" class="tl_submit">' . $e($this->trans('audit.crawlerCheckButton')) . '</button></div>'
             . '</fieldset></form>';
 
         foreach ($results as $result) {
             $html .= '<fieldset class="tl_tbox block"><legend>' . $e($result['domain']) . ($result['title'] !== '' ? ' — ' . $e($result['title']) : '') . '</legend>';
 
             if ($result['status'] === 'error') {
-                $html .= '<p class="tl_error">robots.txt konnte nicht geladen werden: ' . $e($result['error']) . '</p></fieldset>';
+                $html .= '<p class="tl_error">' . $e($this->transf('audit.robotsLoadError', $result['error'])) . '</p></fieldset>';
                 continue;
             }
 
             if ($result['status'] === 'missing') {
-                $html .= '<p class="tl_info">Keine robots.txt gefunden — damit dürfen alle Crawler zugreifen, aber es wird keine Sitemap angekündigt.</p>';
+                $html .= '<p class="tl_info">' . $e($this->trans('audit.robotsMissing')) . '</p>';
             }
 
             $html .= '<table class="tl_listing" style="width:100%"><thead><tr>'
                 . '<th class="tl_folder_tlist">Crawler</th>'
-                . '<th class="tl_folder_tlist">Zweck</th>'
+                . '<th class="tl_folder_tlist">' . $e($this->trans('audit.colPurpose')) . '</th>'
                 . '<th class="tl_folder_tlist">Status</th>'
                 . '</tr></thead><tbody>';
 
@@ -208,8 +205,8 @@ final class AuditModule
                 $explicit = (bool) ($verdict['explicit'] ?? false);
 
                 $badge = $allowed
-                    ? '<span class="seo-studio-badge seo-studio-badge--good">erlaubt' . ($explicit ? '' : ' (implizit)') . '</span>'
-                    : '<span class="seo-studio-badge seo-studio-badge--bad">blockiert</span>';
+                    ? '<span class="seo-studio-badge seo-studio-badge--good">' . $e($this->trans('audit.badgeAllowed')) . ($explicit ? '' : $e($this->trans('audit.badgeImplicit'))) . '</span>'
+                    : '<span class="seo-studio-badge seo-studio-badge--bad">' . $e($this->trans('audit.badgeBlocked')) . '</span>';
 
                 $html .= '<tr class="tl_file_list"><td class="tl_file_list">' . $e($info['label']) . '</td>'
                     . '<td class="tl_file_list">' . $e($info['purpose']) . '</td>'
@@ -219,13 +216,13 @@ final class AuditModule
             $html .= '</tbody></table>';
 
             $html .= $result['sitemapAnnounced']
-                ? '<p class="tl_confirm" style="margin-top:8px">Sitemap angekündigt: ' . $e(implode(', ', (array) $result['sitemaps'])) . '</p>'
-                : '<p class="tl_info" style="margin-top:8px">Keine Sitemap-Zeile in der robots.txt. Empfehlung: <code>Sitemap: https://' . $e($result['domain']) . '/sitemap.xml</code> ergänzen.</p>';
+                ? '<p class="tl_confirm" style="margin-top:8px">' . $e($this->transf('audit.sitemapAnnounced', implode(', ', (array) $result['sitemaps']))) . '</p>'
+                : '<p class="tl_info" style="margin-top:8px">' . $this->transf('audit.sitemapMissing', $e($result['domain'])) . '</p>';
 
             $fix = $auditor->buildFixSuggestion($result);
             if ($fix !== '') {
-                $html .= '<h3 style="margin-top:12px">Korrektur-Vorschlag</h3>'
-                    . '<p>Diesen Block in den Startpunkt der Website (Seitenstruktur → Root-Seite → Feld „Eigene robots.txt-Einträge“) einfügen:</p>'
+                $html .= '<h3 style="margin-top:12px">' . $e($this->trans('audit.fixSuggestionHeading')) . '</h3>'
+                    . '<p>' . $e($this->trans('audit.fixSuggestionHelp')) . '</p>'
                     . '<pre class="seo-studio-pre">' . $e($fix) . '</pre>';
             }
 
@@ -233,7 +230,7 @@ final class AuditModule
         }
 
         if ($results === [] && $cacheTime === 0) {
-            $html .= '<p class="tl_info">Noch keine Prüfung durchgeführt — „Jetzt prüfen“ klicken.</p>';
+            $html .= '<p class="tl_info">' . $e($this->trans('audit.crawlerNotCheckedYet')) . '</p>';
         }
 
         return $html;
@@ -260,17 +257,17 @@ final class AuditModule
         $html = '<form method="post" action="">'
             . '<input type="hidden" name="REQUEST_TOKEN" value="' . $e($token) . '">'
             . '<input type="hidden" name="seoStudioAction" value="scores">'
-            . '<fieldset class="tl_tbox block"><legend>SEO/GEO/AEO-Score (Sichtbarkeits-Reifegrad)</legend>'
-            . '<p>Kombinierter Score aus klassischem <strong>SEO</strong>, <strong>GEO</strong> (generative Suche) und <strong>AEO</strong> (Antwort-Engines). Bewertet pro Seite: Meta, Überschriften, Antwort-zuerst-Einstieg, strukturierte Formate, FAQ, Aktualität, Schema. 10 Seiten pro Durchlauf.</p>'
+            . '<fieldset class="tl_tbox block"><legend>' . $e($this->trans('audit.geoScoreLegend')) . '</legend>'
+            . '<p>' . $this->trans('audit.geoScoreHelp') . '</p>'
             . '<div class="tl_submit_container" style="margin:8px 0 12px">'
-            . '<button type="submit" class="tl_submit">Scores berechnen (ohne KI)</button> '
-            . '<button type="submit" class="tl_submit" name="withLlm" value="1">Scores berechnen (mit KI-Check)</button>'
+            . '<button type="submit" class="tl_submit">' . $e($this->trans('audit.geoScoreComputeButton')) . '</button> '
+            . '<button type="submit" class="tl_submit" name="withLlm" value="1">' . $e($this->trans('audit.geoScoreComputeLlmButton')) . '</button>'
             . '</div>';
 
         if ($scores !== []) {
             $html .= '<table class="tl_listing" style="width:100%"><thead><tr>'
-                . '<th class="tl_folder_tlist">Seite</th><th class="tl_folder_tlist">Score</th>'
-                . '<th class="tl_folder_tlist">Schwachstellen</th><th class="tl_folder_tlist">Stand</th></tr></thead><tbody>';
+                . '<th class="tl_folder_tlist">' . $e($this->trans('audit.colPage')) . '</th><th class="tl_folder_tlist">Score</th>'
+                . '<th class="tl_folder_tlist">' . $e($this->trans('audit.colWeaknesses')) . '</th><th class="tl_folder_tlist">' . $e($this->trans('audit.colAsOf')) . '</th></tr></thead><tbody>';
 
             foreach ($scores as $row) {
                 $components = json_decode((string) $row['components'], true) ?: [];
@@ -293,7 +290,7 @@ final class AuditModule
 
             $html .= '</tbody></table>';
         } else {
-            $html .= '<p class="tl_info">Noch keine Scores — „Scores berechnen“ klicken.</p>';
+            $html .= '<p class="tl_info">' . $e($this->trans('audit.geoScoreEmpty')) . '</p>';
         }
 
         return $html . '</fieldset></form>';
@@ -317,14 +314,14 @@ final class AuditModule
             $stale = array_values(array_filter($stale, static fn (array $r): bool => isset($set[(int) $r['id']])));
         }
 
-        $html = '<fieldset class="tl_tbox block"><legend>Aktualitäts-Monitor (älter als 14 Tage)</legend>';
+        $html = '<fieldset class="tl_tbox block"><legend>' . $e($this->trans('audit.freshnessLegend')) . '</legend>';
 
         if ($stale === []) {
-            $html .= '<p class="tl_confirm">Alle veröffentlichten Seiten wurden in den letzten 14 Tagen aktualisiert.</p>';
+            $html .= '<p class="tl_confirm">' . $e($this->trans('audit.freshnessAllFresh')) . '</p>';
         } else {
-            $html .= '<p>KI-Suchmaschinen gewichten Aktualität. Älteste zuerst:</p><ul>';
+            $html .= '<p>' . $e($this->trans('audit.freshnessIntro')) . '</p><ul>';
             foreach ($stale as $page) {
-                $html .= '<li>' . $e($page['title']) . ' <span class="seo-studio-muted">(ID ' . $page['id'] . ')</span> — vor ' . $page['ageDays'] . ' Tagen geändert</li>';
+                $html .= '<li>' . $e($page['title']) . ' <span class="seo-studio-muted">(ID ' . $page['id'] . ')</span>' . $e($this->transf('audit.freshnessChangedDaysAgo', $page['ageDays'])) . '</li>';
             }
             $html .= '</ul>';
         }
@@ -345,32 +342,32 @@ final class AuditModule
         $html = '<form method="post" action="">'
             . '<input type="hidden" name="REQUEST_TOKEN" value="' . $e($token) . '">'
             . '<input type="hidden" name="seoStudioAction" value="imagewizard">'
-            . '<fieldset class="tl_tbox block"><legend>Bild-Audit (Performance)</legend>';
+            . '<fieldset class="tl_tbox block"><legend>' . $e($this->trans('audit.imagesLegend')) . '</legend>';
 
         $unassignedCount = \count($audit['unassigned']);
         if ($unassignedCount > 0) {
-            $html .= '<p class="tl_error">' . $unassignedCount . ' Bild-Element(e) ohne Bildgrößen-Zuweisung — Originale werden unskaliert ausgeliefert.</p>'
+            $html .= '<p class="tl_error">' . $e($this->transf('audit.imagesUnassigned', $unassignedCount)) . '</p>'
                 . '<div class="tl_submit_container" style="margin:8px 0">'
-                . '<button type="submit" class="tl_submit" onclick="return confirm(\'Bildgröße „SEO Studio Responsiv“ (1200px, proportional, Lazy-Loading) anlegen und ' . $unassignedCount . ' Element(en) zuweisen?\')">Automatisch zuweisen</button>'
+                . '<button type="submit" class="tl_submit" onclick="return confirm(\'' . $this->transf('audit.imagesAssignConfirm', $unassignedCount) . '\')">' . $e($this->trans('audit.imagesAssignButton')) . '</button>'
                 . '</div>';
         } else {
-            $html .= '<p class="tl_confirm">Alle Bild-Elemente haben eine Bildgrößen-Zuweisung.</p>';
+            $html .= '<p class="tl_confirm">' . $e($this->trans('audit.imagesAllAssigned')) . '</p>';
         }
 
         if ($audit['oversized'] !== []) {
-            $html .= '<h3 style="margin-top:10px">Übergroße Originale</h3><ul>';
+            $html .= '<h3 style="margin-top:10px">' . $e($this->trans('audit.imagesOversizedHeading')) . '</h3><ul>';
             foreach ($audit['oversized'] as $file) {
                 $html .= '<li><code>' . $e($file['path']) . '</code> — ' . $file['width'] . '×' . $file['height'] . ' px, ' . number_format($file['bytes'] / 1024, 0, ',', '.') . ' KB</li>';
             }
-            $html .= '</ul><p class="tl_help">Empfehlung: Originale vor dem Upload auf max. 2560 px verkleinern.</p>';
+            $html .= '</ul><p class="tl_help">' . $e($this->trans('audit.imagesOversizedHint')) . '</p>';
         }
 
         if (!$audit['webp']['configured']) {
-            $html .= '<h3 style="margin-top:10px">WebP nicht aktiviert</h3>'
-                . '<p>Moderne Formate sparen 25-60 % Dateigröße. Diesen Block in <code>config/config.yaml</code> einfügen (SEO Studio schreibt diese Datei bewusst nie selbst):</p>'
+            $html .= '<h3 style="margin-top:10px">' . $e($this->trans('audit.webpDisabledHeading')) . '</h3>'
+                . '<p>' . $this->trans('audit.webpHelp') . '</p>'
                 . '<pre class="seo-studio-pre">' . $e($audit['webp']['snippet']) . '</pre>';
         } else {
-            $html .= '<p class="tl_confirm" style="margin-top:8px">Modernes Bildformat (WebP/AVIF) ist konfiguriert.</p>';
+            $html .= '<p class="tl_confirm" style="margin-top:8px">' . $e($this->trans('audit.webpConfigured')) . '</p>';
         }
 
         return $html . '</fieldset></form>';
@@ -408,17 +405,17 @@ final class AuditModule
         $html = '<form method="post" action="">'
             . '<input type="hidden" name="REQUEST_TOKEN" value="' . $e($tokenValue) . '">'
             . '<input type="hidden" name="seoStudioAction" value="structure">'
-            . '<fieldset class="tl_tbox block"><legend>Struktur-Audit (Überschriften + Antwort-zuerst)</legend>'
-            . '<p>Deterministische Überschriften-Prüfung plus KI-Check, ob der Einstiegsabsatz das Thema direkt beantwortet (AEO). Prüft eine einzelne Seite' . ($scopeIds !== null ? ' aus dem gewählten Startpunkt' : '') . '.</p>'
+            . '<fieldset class="tl_tbox block"><legend>' . $e($this->trans('audit.structureLegend')) . '</legend>'
+            . '<p>' . $e($this->transf('audit.structureHelp', $scopeIds !== null ? $this->trans('audit.structureScopeSuffix') : '')) . '</p>'
             . ($options === ''
-                ? '<p class="tl_info">Keine Seiten im gewählten Startpunkt.</p>'
+                ? '<p class="tl_info">' . $e($this->trans('audit.structureNoPages')) . '</p>'
                 : '<div class="seo-studio-inline-row">'
                     . '<select name="seoStudioPageId" class="tl_select">' . $options . '</select>'
-                    . '<button type="submit" class="tl_submit">Seite prüfen</button>'
+                    . '<button type="submit" class="tl_submit">' . $e($this->trans('audit.structureCheckButton')) . '</button>'
                     . '</div>');
 
         if (\is_array($last) && $lastPageId > 0) {
-            $html .= '<h3 style="margin-top:12px">Ergebnis (' . $e(date('d.m.Y H:i', (int) ($last['time'] ?? 0))) . ')</h3>';
+            $html .= '<h3 style="margin-top:12px">' . $e($this->transf('audit.structureResultHeading', date('d.m.Y H:i', (int) ($last['time'] ?? 0)))) . '</h3>';
 
             foreach ((array) ($last['headings'] ?? []) as $finding) {
                 $severity = (string) ($finding['severity'] ?? 'info');
@@ -433,15 +430,15 @@ final class AuditModule
 
             $answerFirst = $last['answerFirst'] ?? null;
             if (\is_array($answerFirst)) {
-                $html .= '<h4 style="margin-top:10px">Antwort-zuerst-Einstieg: '
+                $html .= '<h4 style="margin-top:10px">' . $e($this->trans('audit.answerFirstHeading'))
                     . '<span class="seo-studio-badge seo-studio-badge--' . $e($answerFirst['color'] ?? 'mid') . '">' . (int) ($answerFirst['score'] ?? 0) . '/100</span></h4>'
                     . '<p>' . $e($answerFirst['reason'] ?? '') . '</p>';
 
                 foreach ((array) ($answerFirst['alternatives'] ?? []) as $alternative) {
-                    $html .= '<p class="seo-studio-note">Vorschlag: ' . $e($alternative) . '</p>';
+                    $html .= '<p class="seo-studio-note">' . $e($this->transf('audit.answerFirstSuggestion', $alternative)) . '</p>';
                 }
             } elseif (isset($last['answerFirstError'])) {
-                $html .= '<p class="tl_info">Antwort-zuerst-Check übersprungen: ' . $e($last['answerFirstError']) . '</p>';
+                $html .= '<p class="tl_info">' . $e($this->transf('audit.answerFirstSkipped', $last['answerFirstError'])) . '</p>';
             }
         }
 
@@ -455,19 +452,19 @@ final class AuditModule
 
         $duplicates = $checker->findAll();
 
-        $html = '<fieldset class="tl_tbox block"><legend>Duplikate (Seitentitel / Beschreibung)</legend>';
+        $html = '<fieldset class="tl_tbox block"><legend>' . $e($this->trans('audit.duplicatesLegend')) . '</legend>';
 
         if ($duplicates === []) {
-            return $html . '<p class="tl_confirm">Keine doppelten Seitentitel oder Beschreibungen gefunden.</p></fieldset>';
+            return $html . '<p class="tl_confirm">' . $e($this->trans('audit.duplicatesNone')) . '</p></fieldset>';
         }
 
         foreach ($duplicates as $duplicate) {
-            $label = $duplicate['field'] === 'pageTitle' ? 'Seitentitel' : 'Beschreibung';
+            $label = $duplicate['field'] === 'pageTitle' ? $this->trans('audit.fieldPageTitle') : $this->trans('audit.fieldDescription');
             $pageList = implode(', ', array_map(
                 static fn (array $p): string => $p['title'] . ' (ID ' . $p['id'] . ')',
                 $duplicate['pages'],
             ));
-            $html .= '<p class="tl_error">' . $e($label) . ' „' . $e(mb_substr($duplicate['value'], 0, 80)) . '“ auf ' . \count($duplicate['pages']) . ' Seiten: ' . $e($pageList) . '</p>';
+            $html .= '<p class="tl_error">' . $e($this->transf('audit.duplicateFound', $label, mb_substr($duplicate['value'], 0, 80), \count($duplicate['pages']), $pageList)) . '</p>';
         }
 
         return $html . '</fieldset>';

@@ -119,6 +119,34 @@ trait PackageFixture
     }
 
     /**
+     * A signed WITHDRAWAL, shaped exactly as the licence server builds one.
+     *
+     * The two things that make it a withdrawal rather than a grant are the
+     * status and the fact that license_domain is deliberately ABSENT from
+     * license_domains — the host has just been released, so the authorised set
+     * no longer names it. An empty $remaining is the legitimate "customer
+     * released their last domain" case.
+     *
+     * Everything else is the licence exactly as it stands: same key, package,
+     * features and term. A revocation states where the licence may run, never
+     * whether the customer still owns it.
+     *
+     * @param list<string>         $remaining the hosts still authorised
+     * @param array<string, mixed> $overrides
+     *
+     * @return array{payload: string, envelope: \stdClass, bytes: string, document: array<string, mixed>}
+     */
+    protected function revocation(string $released = 'example.com', array $remaining = [], array $overrides = []): array
+    {
+        return $this->package(array_merge([
+            'license_domain' => $released,
+            'license_domains' => $remaining,
+            'validation_status' => 'revoked',
+            'license_version' => 8,
+        ], $overrides));
+    }
+
+    /**
      * @param list<string> $hosts
      */
     protected function inventory(array $hosts = ['example.com'], ?string $current = 'example.com'): HostInventory
@@ -157,6 +185,14 @@ trait PackageFixture
             public function outboundHost(): ?string
             {
                 return $this->current ?? ($this->configuredHosts()[0] ?? null);
+            }
+
+            public function owns(string $host): bool
+            {
+                $normalized = HostName::normalize($host);
+
+                return $normalized !== null
+                    && (\in_array($normalized, $this->configuredHosts(), true) || $normalized === $this->current);
             }
 
             public function reset(): void

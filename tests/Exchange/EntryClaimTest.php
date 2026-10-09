@@ -234,7 +234,7 @@ final class EntryClaimTest extends TestCase
 
         $store = new ProvisioningStore($this->projectDir);
         $inventory = $this->inventory();
-        $acceptance = new PackageAcceptance($this->testVerifier(), $this->testRing(), $inventory);
+        $acceptance = new PackageAcceptance($this->testVerifier(), $this->testRing(), $inventory, $store);
 
         if ($licensed && !$store->exists()) {
             $package = $this->package();

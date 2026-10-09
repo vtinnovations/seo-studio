@@ -90,9 +90,9 @@ final class SettingsModule
                 /** @var \VTinnovations\SeoStudio\Feature\LlmsTxt\SummaryGenerator $generator */
                 $generator = $container->get(\VTinnovations\SeoStudio\Feature\LlmsTxt\SummaryGenerator::class);
                 $summary = $generator->generateAndStore();
-                Message::addConfirmation('llms.txt-Zusammenfassung erzeugt: „' . $summary . '“');
+                Message::addConfirmation($this->transf('llms.summaryGenerated', $summary));
             } catch (\Throwable $e) {
-                Message::addError('Zusammenfassung fehlgeschlagen: ' . $e->getMessage());
+                Message::addError($this->transf('error.summaryGenerationFailed', $e->getMessage()));
             }
 
             return;
@@ -230,7 +230,7 @@ final class SettingsModule
             . '<select name="aiProvider" id="ctrl_aiProvider" class="tl_select">'
             . '<option value="anthropic"' . $selected($provider, 'anthropic') . '>Anthropic (Claude)</option>'
             . '<option value="openai"' . $selected($provider, 'openai') . '>OpenAI</option>'
-            . '<option value="compatible"' . $selected($provider, 'compatible') . '>OpenAI-kompatibel (eigene URL)</option>'
+            . '<option value="compatible"' . $selected($provider, 'compatible') . '>' . $e($this->trans('aiProviderCompatible')) . '</option>'
             . '</select></div>'
             . '<div class="widget w50"><h3><label for="ctrl_aiModel">' . $t('aiModel', 'Modell (leer = Standard)') . '</label></h3>'
             . '<input type="text" name="aiModel" id="ctrl_aiModel" class="tl_text" value="' . $e($config->get('aiModel', '')) . '" placeholder="claude-haiku-4-5 / gpt-4o-mini"></div>'
@@ -250,7 +250,7 @@ final class SettingsModule
         // ── Features ────────────────────────────────────────────────
         $featuresFieldset = '<fieldset class="tl_tbox block">'
             . '<legend>' . $t('legendFeatures', 'Funktionen') . '</legend>'
-            . '<p>Deaktivierte Funktionen verschwinden komplett aus dem Backend (Menüpunkte, Buttons, Panels).</p>'
+            . '<p>' . $e($this->trans('features.disabledHint')) . '</p>'
             . $featureRows
             . '</fieldset>';
 
@@ -320,8 +320,7 @@ final class SettingsModule
             ['schema', $this->trans('legendSchema'), $schemaFieldset],
         ]);
 
-        $intro = '<p>Zentrale Einstellungen für KI-Anbieter, Funktionen, Verhalten und strukturierte Daten. '
-            . 'Deaktivierte Funktionen verschwinden komplett aus dem Backend.</p>';
+        $intro = $this->trans('settingsIntro');
 
         $form = '<form method="post" action="">'
             . '<input type="hidden" name="REQUEST_TOKEN" value="' . $e($tokenValue) . '">'

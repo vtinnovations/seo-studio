@@ -16,6 +16,7 @@ use VTinnovations\SeoStudio\Core\Ai\AiException;
 use VTinnovations\SeoStudio\Core\Ai\AiExceptionKind;
 use VTinnovations\SeoStudio\Core\Ai\AiGateway;
 use VTinnovations\SeoStudio\Core\Ai\PromptBundle;
+use VTinnovations\SeoStudio\Core\Config\Translations;
 use VTinnovations\SeoStudio\Core\Content\ContentExtractor;
 
 /**
@@ -54,7 +55,7 @@ final class KeywordSuggester
         $content = $this->extractor->forPage($pageId);
 
         if ($content->isEmpty() && $content->pageTitle === '') {
-            throw new \RuntimeException('Die Seite hat keinen extrahierbaren Inhalt — bitte erst Inhalte anlegen.');
+            throw new \RuntimeException(Translations::text('error.noExtractableContent'));
         }
 
         $system = 'Du bist ein SEO-Experte. Du bestimmst das EINE wichtigste Fokus-Keyword einer Seite: '
@@ -78,7 +79,7 @@ final class KeywordSuggester
 
         $json = $response->asJson();
         if ($json === null || !\is_string($json['keyword'] ?? null) || trim($json['keyword']) === '') {
-            throw new AiException('KI-Antwort war kein gültiges JSON.', AiExceptionKind::InvalidResponse);
+            throw new AiException(Translations::text('error.aiInvalidJson'), AiExceptionKind::InvalidResponse);
         }
 
         $keyword = trim((string) preg_replace('/\s+/u', ' ', $json['keyword']));

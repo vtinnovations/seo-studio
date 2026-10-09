@@ -17,6 +17,7 @@ use Contao\FilesModel;
 use Contao\StringUtil;
 use Contao\Validator;
 use VTinnovations\SeoStudio\Core\Ai\AiGateway;
+use VTinnovations\SeoStudio\Core\Config\Translations;
 use VTinnovations\SeoStudio\Feature\InlinePanel\ContextResolver;
 use VTinnovations\SeoStudio\Feature\InlinePanel\PanelResult;
 use VTinnovations\SeoStudio\Feature\InlinePanel\VerdictCache;
@@ -63,12 +64,12 @@ final class AltTextAdapter extends AbstractAdapter
         $row = $this->context->contentRow($rowId);
 
         if ($row === null) {
-            return new PanelResult(0, 'Element nicht gefunden.', []);
+            return new PanelResult(0, Translations::text('error.elementNotFound'), []);
         }
 
         $image = $this->loadImage($row);
         if ($image === null) {
-            return new PanelResult(0, 'Bild konnte nicht geladen werden (fehlt, zu groß oder kein JPEG/PNG/WebP/GIF).', []);
+            return new PanelResult(0, Translations::text('optimize.altText.loadFailed'), []);
         }
 
         $pageTitle = $this->context->pageTitle($this->context->pageIdForContentElement($rowId));

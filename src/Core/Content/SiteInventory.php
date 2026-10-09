@@ -144,6 +144,55 @@ final class SiteInventory implements HostInventory
     }
 
     /**
+     * Whether this installation serves the given host at all.
+     *
+     * The configured inventory plus the host the current request arrived on.
+     * The request host is included here — and deliberately NOT gated on being
+     * configured, unlike currentTrustedHost() — because a site root's "dns"
+     * field commonly names only one of the apex/"www." pair while the web
+     * server answers on both, and the vendor's withdrawal probe may address
+     * either one. Symfony has already applied the installation's trusted-host
+     * and trusted-proxy configuration by the time getHost() answers.
+     *
+     * This can never widen entitlement: it is consulted only to decide whether
+     * a signed WITHDRAWAL was addressed to this installation, and a withdrawal
+     * grants nothing. Entitlement still comes exclusively from the intersection
+     * of the configured inventory with the signed host set.
+     */
+    public function owns(string $host): bool
+    {
+        $normalized = HostName::normalize($host);
+        if ($normalized === null) {
+            return false;
+        }
+
+        if (\in_array($normalized, $this->configuredHosts(), true)) {
+            return true;
+        }
+
+        return $normalized === $this->requestHost();
+    }
+
+    /**
+     * The current request's host, canonical, with no membership requirement.
+     * Null in CLI/cron context and whenever Symfony refuses the host.
+     */
+    private function requestHost(): ?string
+    {
+        $request = $this->requestStack->getCurrentRequest();
+        if (!$request instanceof Request) {
+            return null;
+        }
+
+        try {
+            return HostName::normalize($request->getHost());
+        } catch (\Throwable) {
+            // Symfony rejects a host that violates the trusted-host config.
+            return null;
+        }
+    }
+
+    /**
      * The exact hosts present in BOTH the configured inventory and a signed
      * host set. This intersection — never a suffix or wildcard rule — is what
      * authorises this installation.

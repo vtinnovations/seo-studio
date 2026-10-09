@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace VTinnovations\SeoStudio\Tests\Controller;
 
 use Doctrine\DBAL\Connection;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpClient\MockHttpClient;
@@ -19,8 +20,10 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use VTinnovations\SeoStudio\Controller\ExchangeCallbackController;
 use VTinnovations\SeoStudio\Core\Config\EntitlementEvaluator;
+use VTinnovations\SeoStudio\Core\Config\EntitlementState;
 use VTinnovations\SeoStudio\Core\Config\PackagePolicy;
 use VTinnovations\SeoStudio\Core\Config\ProvisioningStore;
+use VTinnovations\SeoStudio\Core\Content\HostInventory;
 use VTinnovations\SeoStudio\Exchange\Endpoint;
 use VTinnovations\SeoStudio\Exchange\InboundRequestCheck;
 use VTinnovations\SeoStudio\Exchange\Journal;
@@ -121,6 +124,118 @@ final class ExchangeCallbackControllerTest extends TestCase
         self::assertNotNull($record);
         self::assertSame(9, $record->version());
         self::assertSame(md5($record->bytes), $record->envelopeDigest());
+    }
+
+    /**
+     * The domain transfer, driven through the public endpoint the vendor
+     * actually calls.
+     *
+     * Before this worked, the endpoint answered 422 for a signed revocation and
+     * LEFT THE OLD VALID RECORD ON DISK — so the vendor saw a rejection, the
+     * customer's old site carried on fully licensed, and the only thing that
+     * would ever have corrected it was somebody pressing "Update licence"
+     * there.
+     */
+    public function testASignedRevocationIsAppliedThroughTheEndpoint(): void
+    {
+        $store = new ProvisioningStore($this->projectDir);
+        $inventory = $this->inventory();
+
+        // The installation is licensed and running.
+        $this->controller($store, $this->connection(), $inventory)($this->signedPush([
+            'license_version' => 9,
+            'license_verified_at' => $this->now,
+        ], 'req-grant'));
+        self::assertTrue($this->entitlement($store, $inventory)->evaluate($this->now)->licensed);
+
+        // The customer moves the licence to another site.
+        $response = $this->controller($store, $this->connection(), $inventory)(
+            $this->signedWithdrawal(['license_version' => 10, 'license_verified_at' => $this->now], 'req-revoke'),
+        );
+
+        self::assertSame(200, $response->getStatusCode());
+
+        /** @var array<string, mixed> $body */
+        $body = json_decode((string) $response->getContent(), true);
+        self::assertSame('updated', $body['status'], 'an authentic negative state is a successful update');
+        self::assertSame(10, $body['license_version'], 'the acknowledgement must report the packet version, not 0');
+
+        // The withdrawal is now the authoritative state, and the product is off.
+        self::assertSame(10, $store->load()?->version());
+        self::assertSame('revoked', $store->load()?->validationStatus());
+
+        $state = $this->entitlement($store, $inventory)->evaluate($this->now);
+        self::assertFalse($state->licensed);
+        self::assertSame(EntitlementState::REVOKED, $state->status);
+    }
+
+    /**
+     * How the vendor catalogue may spell this product's display title.
+     *
+     * @return list<array{string}>
+     */
+    public static function catalogueTitles(): array
+    {
+        return [[PackagePolicy::TITLE], ['SEO Studio'], [PackagePolicy::PROJECT_SLUG], ['Renamed In The Backend']];
+    }
+
+    /**
+     * The whole domain-transfer path, end to end, with the body's "project"
+     * spelled the way the vendor CATALOGUE spells it rather than the way the
+     * wire does.
+     *
+     * The vendor reads that field straight off the product record, so this is
+     * not a hypothetical variant — it is what a released installation is
+     * actually sent. While it was pinned byte-for-byte the endpoint answered
+     * 401 to every push, the vendor recorded the host as unreachable, and the
+     * site that had just lost the licence carried on serving the product until
+     * the lease ran out weeks later.
+     */
+    #[DataProvider('catalogueTitles')]
+    public function testARevocationIsAppliedWhateverSpellingOfTheTitleItCarries(string $title): void
+    {
+        $store = new ProvisioningStore($this->projectDir);
+        $inventory = $this->inventory();
+
+        $this->controller($store, $this->connection(), $inventory)(
+            $this->signedPush(['license_version' => 9, 'license_verified_at' => $this->now], 'req-grant'),
+        );
+        self::assertTrue($this->entitlement($store, $inventory)->evaluate($this->now)->licensed);
+
+        $response = $this->controller($store, $this->connection(), $inventory)(
+            $this->signedWithdrawal(
+                ['license_version' => 10, 'license_verified_at' => $this->now],
+                'req-revoke',
+                $title,
+            ),
+        );
+
+        self::assertSame(200, $response->getStatusCode(), $title);
+
+        $state = $this->entitlement($store, $inventory)->evaluate($this->now);
+        self::assertFalse($state->licensed, $title);
+        self::assertSame(EntitlementState::REVOKED, $state->status, $title);
+    }
+
+    /**
+     * A withdrawal that names a host this installation does not serve must be
+     * refused, so the vendor keeps probing and reaches the host that really
+     * needs telling. See HostInventory::owns().
+     */
+    public function testAWithdrawalForAnUnservedHostIsRefusedByTheEndpoint(): void
+    {
+        $store = new ProvisioningStore($this->projectDir);
+
+        $response = $this->controller($store, $this->connection(), $this->inventory(['www.example.com'], 'www.example.com'))(
+            $this->signedWithdrawal(['license_version' => 10], 'req-probe'),
+        );
+
+        self::assertSame(Response::HTTP_UNPROCESSABLE_ENTITY, $response->getStatusCode());
+
+        /** @var array<string, mixed> $body */
+        $body = json_decode((string) $response->getContent(), true);
+        self::assertSame('rejected', $body['status']);
+        self::assertArrayNotHasKey('reason', $body, 'the caller must not learn which check failed');
     }
 
     public function testExactRetryIsIdempotentAndDoesNotApplyTwice(): void
@@ -228,15 +343,39 @@ final class ExchangeCallbackControllerTest extends TestCase
     }
 
     /**
+     * A signed withdrawal delivered to 'example.com', which is the host the
+     * push body addresses.
+     *
+     * @param array<string, mixed> $overrides
+     */
+    private function signedWithdrawal(array $overrides = [], string $requestId = 'req-revoke', ?string $project = null): Request
+    {
+        $package = $this->revocation('example.com', ['newsite.com'], $overrides);
+
+        return $this->signRequest($this->pushBody($package, $requestId, $project), $requestId);
+    }
+
+    private function entitlement(ProvisioningStore $store, mixed $inventory): EntitlementEvaluator
+    {
+        \assert($inventory instanceof HostInventory);
+
+        return new EntitlementEvaluator(
+            $store,
+            new PackageAcceptance($this->testVerifier(), $this->testRing(), $inventory, $store),
+            $inventory,
+        );
+    }
+
+    /**
      * @param array{payload: string, envelope: \stdClass, bytes: string, document: array<string, mixed>} $package
      *
      * @return array<string, mixed>
      */
-    private function pushBody(array $package, string $requestId): array
+    private function pushBody(array $package, string $requestId, ?string $project = null): array
     {
         return [
             'action' => 'license_update',
-            'project' => PackagePolicy::PROJECT,
+            'project' => $project ?? PackagePolicy::PROJECT,
             'project_slug' => PackagePolicy::PROJECT_SLUG,
             'product_id' => PackagePolicy::PRODUCT_ID,
             'domain' => 'example.com',
@@ -302,7 +441,7 @@ final class ExchangeCallbackControllerTest extends TestCase
 
         $ring = $this->testRing();
         $verifier = $this->testVerifier();
-        $acceptance = new PackageAcceptance($verifier, $ring, $inventory);
+        $acceptance = new PackageAcceptance($verifier, $ring, $inventory, $store);
         $log = new OperationLog(new NullLogger());
         $journal = new Journal($connection);
 

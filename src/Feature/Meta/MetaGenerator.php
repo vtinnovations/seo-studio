@@ -16,6 +16,7 @@ use Doctrine\DBAL\Connection;
 use VTinnovations\SeoStudio\Core\Ai\AiException;
 use VTinnovations\SeoStudio\Core\Ai\AiGateway;
 use VTinnovations\SeoStudio\Core\Ai\PromptBundle;
+use VTinnovations\SeoStudio\Core\Config\Translations;
 use VTinnovations\SeoStudio\Core\Content\ContentExtractor;
 
 /**
@@ -56,7 +57,7 @@ final class MetaGenerator
         $content = $this->extractor->forPage($pageId);
 
         if ($content->isEmpty() && $content->pageTitle === '') {
-            throw new \RuntimeException('Die Seite hat keinen extrahierbaren Inhalt — bitte erst Inhalte anlegen.');
+            throw new \RuntimeException(Translations::text('error.noExtractableContent'));
         }
 
         $siteName = $this->resolveSiteName($pageId);
@@ -119,7 +120,7 @@ final class MetaGenerator
 
         $json = $response->asJson();
         if ($json === null || !\is_string($json['pageTitle'] ?? null) || !\is_string($json['description'] ?? null)) {
-            throw new AiException('KI-Antwort war kein gültiges JSON.', \VTinnovations\SeoStudio\Core\Ai\AiExceptionKind::InvalidResponse);
+            throw new AiException(Translations::text('error.aiInvalidJson'), \VTinnovations\SeoStudio\Core\Ai\AiExceptionKind::InvalidResponse);
         }
 
         return new MetaProposal(

@@ -28,11 +28,26 @@ use VTinnovations\SeoStudio\Exchange\PackageAcceptance;
  *   no configured host in the set   -> unlicensed (copied to another install)
  *   package outside the allowlist   -> unlicensed
  *   not yet started / expired       -> unlicensed
+ *   lease unconfirmed past grace    -> unlicensed
  *   otherwise                       -> licensed
  *
- * There is no trial, no grace period and no free fallback: "free_available" is
- * never consulted. Nothing local — deleting files, clearing caches, editing the
- * database, changing sessions, reinstalling — can produce a licensed state.
+ * A stored WITHDRAWAL (the vendor's signed "this licence moved") is evaluated
+ * through those same rules rather than short-circuited on its status, and that
+ * is the whole design. A withdrawal carries the licence's CURRENT authorised
+ * host set, so the ordinary intersection already answers every question it
+ * raises: an installation that released its only host finds no configured host
+ * in the set and goes dark, while one that serves several of the licence's
+ * hosts and released just one keeps running on the rest. Short-circuiting on
+ * the status instead took the whole installation down in the second case.
+ *
+ * It also makes the order the vendor's two packets arrive in irrelevant: either
+ * way the record left on disk states the right host set.
+ *
+ * There is no trial and no free fallback: "free_available" is never consulted.
+ * The only grace here is the lease's — a bounded allowance for the vendor being
+ * temporarily unreachable, which expires rather than extends. Nothing local —
+ * deleting files, clearing caches, editing the database, changing sessions,
+ * reinstalling — can produce a licensed state.
  *
  * The result is cached per request only. It is never persisted, so a stale
  * cache can never outlive the record it describes.
@@ -137,6 +152,12 @@ final class EntitlementEvaluator
             $status = match ($verdict->category) {
                 PackageAcceptance::NO_INTERSECTION => EntitlementState::NO_HOST_MATCH,
                 PackageAcceptance::PACKAGE => EntitlementState::PACKAGE_NOT_ACCEPTED,
+                // A record the rollback barrier has moved past: authentic, but
+                // an older revision than one already accepted. In practice this
+                // is a pre-transfer backup that has been restored, so the
+                // administrator needs to be told the licence moved, not that
+                // their files are broken.
+                PackageAcceptance::SUPERSEDED => EntitlementState::REVOKED,
                 default => EntitlementState::UNVERIFIABLE,
             };
 
@@ -169,7 +190,12 @@ final class EntitlementEvaluator
             );
         }
 
-        if ($record->hasExpiredAt($now)) {
+        // Two ways a term can be over, and both are licence-wide. The signed
+        // status is the vendor stating it outright; hasExpiredAt() is this
+        // installation reading the licence's own dates. Unlike a revocation,
+        // neither is per-host, so there is nothing to intersect and the signed
+        // host set does not get a say.
+        if ($record->validationStatus() === ProvisioningRecord::STATUS_EXPIRED || $record->hasExpiredAt($now)) {
             // Pro Only: an expired package has no fallback tier whatsoever.
             $this->authenticated = $record;
 
@@ -185,8 +211,34 @@ final class EntitlementEvaluator
 
         $matched = $this->inventory->matchedHost($record->domains());
         if ($matched === null) {
+            // Same condition, two different things to tell the administrator.
+            // A withdrawal means the licence is now somewhere else; anything
+            // else means the configured domains are worth checking.
+            $this->authenticated = $record;
+
             return $this->state = EntitlementState::withheld(
-                EntitlementState::NO_HOST_MATCH,
+                $record->isWithdrawal() ? EntitlementState::REVOKED : EntitlementState::NO_HOST_MATCH,
+                $configured,
+                $record->domains(),
+                $record->version(),
+                $record->expiresAt(),
+                $record->package(),
+            );
+        }
+
+        // The lease. Everything above says the licence is genuine and covers a
+        // host this installation serves; this asks whether the vendor has
+        // confirmed it recently enough to still be trusted.
+        //
+        // It is the only enforcement that survives an installation the vendor
+        // cannot reach — an abuser who firewalls the updater endpoint stops the
+        // push, but cannot stop this clock, because both deadlines are computed
+        // from fields INSIDE the signature.
+        if (PackagePolicy::leaseHasLapsed($record, $now)) {
+            $this->authenticated = $record;
+
+            return $this->state = EntitlementState::withheld(
+                EntitlementState::LEASE_EXPIRED,
                 $configured,
                 $record->domains(),
                 $record->version(),

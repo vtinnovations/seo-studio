@@ -39,6 +39,32 @@ final class ProvisioningStore
 
     private const LOCK = '.transaction.lock';
 
+    /**
+     * The rollback barrier: the highest licence version this installation has
+     * ever accepted, per licence key.
+     *
+     * It exists because record.json/record.seal are exactly what an
+     * administrator has in a backup. Restoring them restores a genuinely
+     * signed, still perfectly verifying licence — which, after a withdrawal,
+     * would hand the entitlement back. The barrier is therefore consulted on
+     * every read and is deliberately NOT removed by remove(): otherwise
+     * "Remove licence" followed by restoring a backup would be the one-click
+     * way around a revocation.
+     *
+     * Barrier only, never a grant. It is never read as entitlement, so removal
+     * still removes.
+     */
+    private const FLOOR = 'record.floor';
+
+    /** Throttle marker for the unattended re-check. Carries no entitlement. */
+    private const ATTEMPT = 'record.attempt';
+
+    /**
+     * Entries kept in the barrier. An installation legitimately sees a handful
+     * of licence keys in its lifetime; the cap only stops an unbounded file.
+     */
+    private const FLOOR_ENTRIES = 64;
+
     private int $depth = 0;
 
     /** @var resource|null */
@@ -179,6 +205,11 @@ final class ProvisioningStore
      * Administrator removal: the authoritative state and its rollback copy both
      * go away, so protected behaviour returns to the framework default
      * immediately and nothing can quietly resurrect the old entitlement.
+     *
+     * The version barrier is deliberately left in place. Removing it here
+     * would make "Remove licence", then restore a pre-transfer backup, the
+     * supported route around a revocation. The barrier grants nothing on its
+     * own, so keeping it cannot keep the product switched on.
      */
     public function remove(): void
     {
@@ -192,9 +223,115 @@ final class ProvisioningStore
         });
     }
 
+    /**
+     * The highest version ever accepted for this licence key, or 0.
+     *
+     * Keyed per LICENCE, not per installation. Version numbers count within
+     * one licence, so a replacement licence bought after a withdrawal
+     * legitimately starts at version 1 while the withdrawn one had reached 60 —
+     * a single global watermark would refuse exactly the customers who did the
+     * right thing.
+     */
+    public function floor(string $licenceKey): int
+    {
+        $marks = $this->marks();
+        $version = $marks[$this->mark($licenceKey)] ?? 0;
+
+        return \is_int($version) && $version > 0 ? $version : 0;
+    }
+
+    /**
+     * Raises the barrier for this licence key. Never lowers it, whatever is
+     * passed, and whatever is currently on disk.
+     */
+    public function raise(string $licenceKey, int $version): void
+    {
+        if ($version < 1) {
+            return;
+        }
+
+        $this->transaction(function () use ($licenceKey, $version): void {
+            $marks = $this->marks();
+            $mark = $this->mark($licenceKey);
+
+            $current = $marks[$mark] ?? 0;
+            if (\is_int($current) && $current >= $version) {
+                return;
+            }
+
+            $marks[$mark] = $version;
+
+            // Oldest-written entries go first; PHP preserves insertion order.
+            while (\count($marks) > self::FLOOR_ENTRIES) {
+                array_shift($marks);
+            }
+
+            $encoded = json_encode($marks, JSON_UNESCAPED_SLASHES);
+            if ($encoded === false || !$this->prepareDirectory()) {
+                return;
+            }
+
+            $this->write($this->path(self::FLOOR), $encoded);
+        });
+    }
+
+    /** When the unattended re-check last ran, or 0 when it never has. */
+    public function lastAttempt(): int
+    {
+        $raw = $this->read($this->path(self::ATTEMPT));
+        if ($raw === null || preg_match('/^\d{1,12}$/', trim($raw)) !== 1) {
+            return 0;
+        }
+
+        return (int) trim($raw);
+    }
+
+    public function markAttempt(int $now): void
+    {
+        if ($this->prepareDirectory()) {
+            $this->write($this->path(self::ATTEMPT), (string) $now);
+        }
+    }
+
     public function directory(): string
     {
         return $this->projectDir . '/' . self::DIRECTORY;
+    }
+
+    /**
+     * The barrier's key for a licence key: a digest, so a leaked barrier file
+     * carries no usable licence key.
+     *
+     * @return non-empty-string
+     */
+    private function mark(string $licenceKey): string
+    {
+        return hash('sha256', 'vt-one/mark-v1:' . $licenceKey);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function marks(): array
+    {
+        $raw = $this->read($this->path(self::FLOOR));
+        if ($raw === null) {
+            return [];
+        }
+
+        try {
+            /** @var mixed $decoded */
+            $decoded = json_decode($raw, true, 8, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return [];
+        }
+
+        if (!\is_array($decoded)) {
+            return [];
+        }
+
+        /** @var array<string, mixed> $decoded */
+        return $decoded;
     }
 
     private function readPair(string $recordPath, string $sealPath): ?ProvisioningRecord

@@ -14,6 +14,7 @@ namespace VTinnovations\SeoStudio\Core\Security;
 
 use Doctrine\DBAL\Connection;
 use VTinnovations\SeoStudio\Core\Config\ConfigProvider;
+use VTinnovations\SeoStudio\Core\Config\Translations;
 
 /**
  * Monthly token budget with hard stop.
@@ -44,8 +45,8 @@ final class TokenBudget
         }
 
         if ($this->getUsageThisMonth() >= $budget) {
-            throw new BudgetExceededException(sprintf(
-                'Monatliches Token-Budget (%s) ist aufgebraucht. KI-Funktionen sind bis Monatsende pausiert.',
+            throw new BudgetExceededException(Translations::text(
+                'error.budgetExhausted',
                 number_format($budget, 0, ',', '.'),
             ));
         }

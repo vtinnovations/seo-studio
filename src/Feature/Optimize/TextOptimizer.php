@@ -16,6 +16,7 @@ use VTinnovations\SeoStudio\Core\Ai\AiException;
 use VTinnovations\SeoStudio\Core\Ai\AiExceptionKind;
 use VTinnovations\SeoStudio\Core\Ai\AiGateway;
 use VTinnovations\SeoStudio\Core\Ai\PromptBundle;
+use VTinnovations\SeoStudio\Core\Config\Translations;
 use VTinnovations\SeoStudio\Feature\InlinePanel\PanelResult;
 
 /**
@@ -204,29 +205,29 @@ final class TextOptimizer
         // says nothing or belongs on another page, so a failure caps the score.
         return [
             [
-                'label' => 'Roter Faden',
+                'label' => Translations::text('optimize.semanticCoherent.label'),
                 'ok' => (bool) $json['coherent'],
                 'note' => '',
                 'weight' => 3.0,
-                'fix' => 'Die Aussagen hängen inhaltlich nicht zusammen' . ($issue !== '' ? ' — ' . $issue : '') . '.',
+                'fix' => Translations::text('optimize.semanticCoherent.fix', $issue !== '' ? ' — ' . $issue : ''),
                 'soft' => false,
                 'cap' => 20,
             ],
             [
-                'label' => 'Zum Seitenthema passend',
+                'label' => Translations::text('optimize.semanticOnTopic.label'),
                 'ok' => (bool) ($json['onTopic'] ?? false),
                 'note' => '',
                 'weight' => 2.0,
-                'fix' => 'Der Inhalt passt nicht zum Thema dieser Seite.',
+                'fix' => Translations::text('optimize.semanticOnTopic.fix'),
                 'soft' => false,
                 'cap' => 40,
             ],
             [
-                'label' => 'Konkrete Aussagen',
+                'label' => Translations::text('optimize.semanticSubstantial.label'),
                 'ok' => (bool) ($json['substantial'] ?? false),
                 'note' => '',
                 'weight' => 2.0,
-                'fix' => 'Zu wenig Substanz — konkrete, nachvollziehbare Aussagen statt allgemeinem Gerede.',
+                'fix' => Translations::text('optimize.semanticSubstantial.fix'),
                 'soft' => false,
                 'cap' => 50,
             ],
@@ -247,14 +248,14 @@ final class TextOptimizer
             }
         }
 
-        $hint = $measured['hints'] !== [] ? ' Hinweis: ' . implode(' ', $measured['hints']) : '';
+        $hint = $measured['hints'] !== [] ? Translations::text('optimize.explainHintPrefix', implode(' ', $measured['hints'])) : '';
 
         if ($measured['violations'] === []) {
-            return 'Alle Kriterien erfüllt: ' . implode(' · ', $passed) . '.' . $hint;
+            return Translations::text('optimize.explainAllSatisfied', implode(' · ', $passed), $hint);
         }
 
-        return 'Erfüllt: ' . (($passed !== []) ? implode(' · ', $passed) : '—')
-            . ' — Offen: ' . implode(' ', $measured['violations']) . $hint;
+        return Translations::text('optimize.explainSatisfiedPrefix', ($passed !== []) ? implode(' · ', $passed) : '—')
+            . Translations::text('optimize.explainOpenSuffix', implode(' ', $measured['violations']), $hint);
     }
 
     /**
@@ -264,7 +265,7 @@ final class TextOptimizer
     {
         if ($generate && trim((string) $ctx['plaintext']) === '' && trim((string) $ctx['pageTitle']) === '') {
             throw new AiException(
-                'Zu wenig Kontext auf der Seite, um Inhalt zu erzeugen — bitte erst Text ergänzen.',
+                Translations::text('error.insufficientContext'),
                 AiExceptionKind::BadRequest,
             );
         }
@@ -372,7 +373,7 @@ final class TextOptimizer
         }
 
         if ($bestText === '') {
-            throw new AiException('KI lieferte keinen Text.', AiExceptionKind::InvalidResponse);
+            throw new AiException(Translations::text('error.aiNoText'), AiExceptionKind::InvalidResponse);
         }
 
         return new PanelResult(

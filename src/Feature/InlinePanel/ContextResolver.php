@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace VTinnovations\SeoStudio\Feature\InlinePanel;
 
 use Doctrine\DBAL\Connection;
+use VTinnovations\SeoStudio\Core\Content\Visibility;
 
 /**
  * Resolves editorial context around a DCA row: the owning page of a content
@@ -69,7 +70,7 @@ final class ContextResolver
         $rows = $this->connection->fetchFirstColumn(
             "SELECT c.headline FROM tl_content c
              JOIN tl_article a ON a.id = c.pid AND c.ptable IN ('', 'tl_article')
-             WHERE a.pid = ? AND a.published = '1' AND c.id != ? AND c.invisible = '' AND c.headline != ''
+             WHERE a.pid = ? AND " . Visibility::article('a') . ' AND c.id != ? AND ' . Visibility::content('c') . " AND c.headline != ''
              ORDER BY a.sorting, c.sorting",
             [$pageId, $contentId],
         );

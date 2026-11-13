@@ -20,6 +20,7 @@ use Symfony\Component\HttpFoundation\Request;
 use VTinnovations\SeoStudio\Core\Config\EntitlementEvaluator;
 use VTinnovations\SeoStudio\Core\Config\FeatureState;
 use VTinnovations\SeoStudio\Core\Config\Translations;
+use VTinnovations\SeoStudio\Core\Content\Visibility;
 use VTinnovations\SeoStudio\Feature\Optimize\FieldScorer;
 
 /**
@@ -162,7 +163,7 @@ final class ListScoreController extends AbstractController
             // Hidden elements never reach a visitor, so they never count.
             $rows = $this->connection->fetchAllAssociative(
                 "SELECT pid, headline, text FROM tl_content
-                 WHERE ptable IN ('', 'tl_article') AND pid IN (?) AND invisible = ''",
+                 WHERE ptable IN ('', 'tl_article') AND pid IN (?) AND " . Visibility::content(),
                 [$articleIds],
                 [ArrayParameterType::INTEGER],
             );

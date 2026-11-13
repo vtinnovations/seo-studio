@@ -17,6 +17,7 @@ use Doctrine\DBAL\Connection;
 use VTinnovations\SeoStudio\Core\Content\ContentExtractor;
 use VTinnovations\SeoStudio\Core\Content\GermanText;
 use VTinnovations\SeoStudio\Core\Content\ExtractedContent;
+use VTinnovations\SeoStudio\Core\Content\Visibility;
 
 /**
  * Deterministic per-page SEO analysis (Yoast/Rank-Math style). NO LLM calls —
@@ -275,7 +276,7 @@ final class PageSeoAnalyzer
                 // so they must not influence the score either.
                 "SELECT c.alt FROM tl_content c
                  JOIN tl_article a ON a.id = c.pid AND c.ptable IN ('', 'tl_article')
-                 WHERE a.pid = ? AND a.published = '1' AND c.invisible = ''
+                 WHERE a.pid = ? AND " . Visibility::article('a') . ' AND ' . Visibility::content('c') . "
                    AND c.type IN ('image', 'picture') AND c.singleSRC IS NOT NULL",
                 [$pageId],
             );

@@ -14,6 +14,7 @@ namespace VTinnovations\SeoStudio\Feature\Optimize;
 
 use Doctrine\DBAL\Connection;
 use VTinnovations\SeoStudio\Core\Content\ContentExtractor;
+use VTinnovations\SeoStudio\Core\Content\Visibility;
 
 /**
  * Resolves the editorial context around ANY text/headline field so the
@@ -153,7 +154,7 @@ final class PageContextResolver
         $body = \is_array($row) ? trim(strip_tags((string) $row['teaser'])) : '';
 
         $texts = $this->connection->fetchFirstColumn(
-            "SELECT text FROM tl_content WHERE ptable = ? AND pid = ? AND invisible = '' AND text IS NOT NULL ORDER BY sorting LIMIT 5",
+            'SELECT text FROM tl_content WHERE ptable = ? AND pid = ? AND ' . Visibility::content() . ' AND text IS NOT NULL ORDER BY sorting LIMIT 5',
             [$table, $rowId],
         );
         $body = trim($body . "\n" . strip_tags(implode("\n", array_map('strval', $texts))));

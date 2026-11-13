@@ -18,6 +18,7 @@ use Contao\StringUtil;
 use Contao\Validator;
 use Doctrine\DBAL\Connection;
 use Symfony\Component\Yaml\Yaml;
+use VTinnovations\SeoStudio\Core\Content\Visibility;
 
 /**
  * Deterministic image/performance audit:
@@ -61,7 +62,7 @@ final class ImageAuditor
     {
         $rows = $this->connection->fetchAllAssociative(
             "SELECT id, type, size FROM tl_content
-             WHERE type IN ('image', 'picture') AND invisible = ''",
+             WHERE type IN ('image', 'picture') AND " . Visibility::content(),
         );
 
         $unassigned = [];
@@ -89,7 +90,7 @@ final class ImageAuditor
 
         $uuids = $this->connection->fetchFirstColumn(
             "SELECT DISTINCT singleSRC FROM tl_content
-             WHERE type IN ('image', 'picture') AND invisible = '' AND singleSRC IS NOT NULL
+             WHERE type IN ('image', 'picture') AND " . Visibility::content() . " AND singleSRC IS NOT NULL
              LIMIT " . self::MAX_FILES_CHECKED,
         );
 
@@ -133,41 +134,84 @@ final class ImageAuditor
     }
 
     /**
-     * READ + RECOMMEND: is a modern default format (webp/avif) configured?
+     * READ + RECOMMEND: does any image size convert to a modern format (webp/avif)?
+     *
+     * Contao 5 enables WebP per image size via "formats" — in config.yaml
+     * (contao.image.sizes.*, incl. "_defaults") or in the backend
+     * (Themes → Image sizes → "Image formats", tl_image_size.formats).
+     * There is no global switch; "imagine_options" only tunes quality.
      *
      * @return array{configured: bool, snippet: string}
      */
     public function checkWebpConfig(): array
     {
-        $configured = false;
-
-        $configFile = $this->projectDir . '/config/config.yaml';
-        if (!is_file($configFile)) {
-            $configFile = $this->projectDir . '/config/config.yml';
-        }
-
-        if (is_file($configFile)) {
-            try {
-                $parsed = Yaml::parseFile($configFile);
-                $formats = $parsed['contao']['image']['preview']['default_format'] ?? null;
-                $validExtensions = $parsed['contao']['image']['valid_extensions'] ?? null;
-                $imagineOptions = $parsed['contao']['image']['imagine_options'] ?? [];
-
-                $configured = (\is_array($imagineOptions) && ($imagineOptions['format'] ?? '') === 'webp')
-                    || $formats === 'webp'
-                    || (\is_array($validExtensions) && \in_array('avif', $validExtensions, true));
-            } catch (\Throwable) {
-                // Unparseable config — recommend anyway.
-            }
-        }
+        $configured = $this->configFileConvertsToModernFormat() || $this->backendSizeConvertsToModernFormat();
 
         $snippet = "# config/config.yaml — moderne Bildformate (von SEO Studio empfohlen)\n"
             . "contao:\n"
             . "    image:\n"
             . "        imagine_options:\n"
-            . "            format: webp\n"
-            . "            webp_quality: 80\n";
+            . "            webp_quality: 80\n"
+            . "        sizes:\n"
+            . "            _defaults:\n"
+            . "                formats:\n"
+            . "                    jpg: [webp, jpg]\n"
+            . "                    png: [webp, png]\n"
+            . "                    gif: [webp, gif]\n";
 
         return ['configured' => $configured, 'snippet' => $snippet];
+    }
+
+    private function configFileConvertsToModernFormat(): bool
+    {
+        $configFile = $this->projectDir . '/config/config.yaml';
+        if (!is_file($configFile)) {
+            $configFile = $this->projectDir . '/config/config.yml';
+        }
+
+        if (!is_file($configFile)) {
+            return false;
+        }
+
+        try {
+            $sizes = Yaml::parseFile($configFile)['contao']['image']['sizes'] ?? null;
+        } catch (\Throwable) {
+            return false; // Unparseable config — recommend anyway.
+        }
+
+        if (!\is_array($sizes)) {
+            return false;
+        }
+
+        foreach ($sizes as $size) {
+            $formats = \is_array($size) ? ($size['formats'] ?? null) : null;
+            if (!\is_array($formats)) {
+                continue;
+            }
+
+            $found = false;
+            array_walk_recursive($formats, static function (mixed $format) use (&$found): void {
+                if (\is_string($format) && \in_array(strtolower($format), ['webp', 'avif'], true)) {
+                    $found = true;
+                }
+            });
+
+            if ($found) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function backendSizeConvertsToModernFormat(): bool
+    {
+        try {
+            return (bool) $this->connection->fetchOne(
+                "SELECT 1 FROM tl_image_size WHERE formats LIKE '%webp%' OR formats LIKE '%avif%' LIMIT 1",
+            );
+        } catch (\Throwable) {
+            return false;
+        }
     }
 }

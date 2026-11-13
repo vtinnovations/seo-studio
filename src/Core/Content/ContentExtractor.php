@@ -58,8 +58,11 @@ final class ContentExtractor
             [$pageId],
         ) ?: [];
 
+        // Only what a visitor sees right now: hidden or scheduled-out articles
+        // and elements must not count (e.g. alternative H1 elements of which
+        // editors switch on one at a time).
         $articleIds = $this->connection->fetchFirstColumn(
-            "SELECT id FROM tl_article WHERE pid = ? AND published = '1' ORDER BY sorting",
+            'SELECT id FROM tl_article WHERE pid = ? AND ' . Visibility::article() . ' ORDER BY sorting',
             [$pageId],
         );
 
@@ -81,7 +84,7 @@ final class ContentExtractor
             $elements = $this->connection->fetchAllAssociative(
                 'SELECT ' . implode(', ', $columns) . "
                  FROM tl_content
-                 WHERE ptable = 'tl_article' AND pid IN (?) AND invisible = ''
+                 WHERE ptable = 'tl_article' AND pid IN (?) AND " . Visibility::content() . "
                  ORDER BY FIELD(pid, ?), sorting",
                 [$articleIds, $articleIds],
                 [ArrayParameterType::INTEGER, ArrayParameterType::INTEGER],

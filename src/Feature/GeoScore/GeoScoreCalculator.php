@@ -15,6 +15,7 @@ namespace VTinnovations\SeoStudio\Feature\GeoScore;
 use Doctrine\DBAL\Connection;
 use VTinnovations\SeoStudio\Core\Config\Translations;
 use VTinnovations\SeoStudio\Core\Config\ConfigProvider;
+use VTinnovations\SeoStudio\Core\Content\Visibility;
 use VTinnovations\SeoStudio\Feature\Audit\AnswerFirstChecker;
 use VTinnovations\SeoStudio\Feature\Audit\HeadingAuditor;
 
@@ -79,7 +80,7 @@ final class GeoScoreCalculator
         $structured = (int) $this->connection->fetchOne(
             "SELECT COUNT(*) FROM tl_content c
              JOIN tl_article a ON a.id = c.pid AND c.ptable IN ('', 'tl_article')
-             WHERE a.pid = ? AND a.published = '1' AND c.invisible = ''
+             WHERE a.pid = ? AND " . Visibility::article('a') . ' AND ' . Visibility::content('c') . "
                AND c.type IN ('list', 'table', 'accordionSingle', 'accordionStart', 'accordion')",
             [$pageId],
         );

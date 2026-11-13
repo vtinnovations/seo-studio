@@ -336,7 +336,7 @@ $GLOBALS['TL_LANG']['SEO_STUDIO']['audit']['tabImages'] = 'Images';
 $GLOBALS['TL_LANG']['SEO_STUDIO']['audit']['tabStructure'] = 'Structure';
 $GLOBALS['TL_LANG']['SEO_STUDIO']['audit']['webpConfigured'] = 'A modern image format (WebP/AVIF) is configured.';
 $GLOBALS['TL_LANG']['SEO_STUDIO']['audit']['webpDisabledHeading'] = 'WebP not enabled';
-$GLOBALS['TL_LANG']['SEO_STUDIO']['audit']['webpHelp'] = 'Modern formats save 25-60% in size. Add this block to <code>config/config.yaml</code> (SEO Studio deliberately never writes this file itself):';
+$GLOBALS['TL_LANG']['SEO_STUDIO']['audit']['webpHelp'] = 'Modern formats save 25-60% in size. Add this block to <code>config/config.yaml</code> (SEO Studio deliberately never writes this file itself). It applies to the image sizes defined in that file; for image sizes created in the backend, enable WebP under Themes → Image sizes → "Image formats". Then clear the cache.';
 
 // ── AI crawler catalogue ────────────────────────────────────────────────
 $GLOBALS['TL_LANG']['SEO_STUDIO']['crawler']['bingbot'] = 'Bing index — the basis for ChatGPT web search and Copilot';

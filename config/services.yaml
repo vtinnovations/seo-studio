@@ -41,6 +41,7 @@ services:
             - '../src/Core/Config/PackagePolicy.php'            # constants
             - '../src/Core/Config/InstanceStatePanel.php'       # Contao widget (new'ed by Contao)
             - '../src/Core/Content/HostName.php'                # static helper
+            - '../src/Core/Content/Visibility.php'              # static helper
             - '../src/Core/Security/CanonicalForm.php'          # static helper
             - '../src/Core/Security/TrustAnchor.php'            # value object
             - '../src/Exchange/Endpoint.php'                    # constants

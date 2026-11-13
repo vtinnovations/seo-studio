@@ -60,7 +60,9 @@ class AnthropicClient extends AbstractHttpClient
     {
         $this->assertEgressAllowed();
         $apiKey = $this->requireApiKey();
-        $endpoint = $this->resolveBaseUrl(static::DEFAULT_BASE) . '/v1/messages';
+        // Fixed endpoint: the configurable base URL belongs to the "compatible"
+        // provider only, so a leftover value can never redirect this key.
+        $endpoint = static::DEFAULT_BASE . '/v1/messages';
 
         $start = microtime(true);
 

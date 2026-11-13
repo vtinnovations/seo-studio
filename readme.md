@@ -155,8 +155,8 @@ Der Lizenzschlüssel erscheint **zu keinem Zeitpunkt vollständig** in der Benut
 
 **Einstellungen → KI-Einstellungen**:
 
-- **Anbieter:** Anthropic (Claude), OpenAI, oder OpenAI-kompatibel (eigene Basis-URL, z. B. für lokal gehostete oder alternative Modelle mit OpenAI-kompatibler API).
-- **API-Schlüssel** eintragen – wird **verschlüsselt gespeichert** (`defuse/php-encryption`, Schlüsseldatei getrennt vom verschlüsselten Wert, beide außerhalb des öffentlichen Webverzeichnisses) und **nie im Klartext angezeigt**; ein leeres Feld beim Speichern behält den vorhandenen Schlüssel bei.
+- **Anbieter:** Anthropic (Claude), OpenAI, Mistral AI (Hosting in der EU; Standardmodell `mistral-small-latest`, das auch die bildbasierte Alt-Text-Prüfung beherrscht) oder OpenAI-kompatibel (eigene Basis-URL, z. B. für lokal gehostete oder alternative Modelle mit OpenAI-kompatibler API). Die Basis-URL gilt nur für den OpenAI-kompatiblen Anbieter; alle anderen Anbieter verbinden sich immer mit ihrem eigenen offiziellen Endpunkt.
+- **API-Schlüssel** eintragen – wird **verschlüsselt gespeichert** (`defuse/php-encryption`, Schlüsseldatei getrennt vom verschlüsselten Wert, beide außerhalb des öffentlichen Webverzeichnisses) und **nie im Klartext angezeigt**; ein leeres Feld beim Speichern behält den vorhandenen Schlüssel bei. Es wird genau **ein** Schlüssel gespeichert: Beim Wechsel des Anbieters den Schlüssel des neuen Anbieters eintragen und ein Modell des alten Anbieters aus dem Feld „Modell“ entfernen (leer lassen = Standardmodell des neuen Anbieters).
 - Optional: Modell überschreiben (Vorgabe je Anbieter), monatliches **Token-Budget** (harter Stopp – ab 100 % lehnt jede weitere KI-Anfrage ab, ab 80 % erscheint ein Warnhinweis auf der Einstellungsseite), Schalter „keine externen Aufrufe“ zum vollständigen Abschalten aller KI-Netzwerkzugriffe.
 - **„Verbindung testen“** führt eine einzelne, minimale Anfrage an den konfigurierten Anbieter aus und meldet Erfolg/Fehler inkl. Antwortzeit — diese Prüfung zählt nicht gegen das Token-Budget.
 
@@ -225,7 +225,7 @@ Dieses Bundle legt eigene Laufzeitdaten in einem Unterverzeichnis von Contaos `v
 
 | Zweck | Ziel | Ausgelöst durch |
 |---|---|---|
-| KI-Generierung (Meta, Text, FAQ, Glossar, Alt-Text, Fokus-Keyword) | konfigurierter KI-Anbieter (Anthropic, OpenAI oder OpenAI-kompatibel) | Klick auf eine „Mit KI …“-Aktion oder den optionalen Meta-Cron |
+| KI-Generierung (Meta, Text, FAQ, Glossar, Alt-Text, Fokus-Keyword) | konfigurierter KI-Anbieter (Anthropic, OpenAI, Mistral AI oder OpenAI-kompatibel) | Klick auf eine „Mit KI …“-Aktion oder den optionalen Meta-Cron |
 | Verbindungstest | konfigurierter KI-Anbieter | Klick auf „Verbindung testen“ |
 | robots.txt-Prüfung | die jeweils eigene Website (nicht ein Drittanbieter) | Klick auf „KI-Crawler-Audit“ in der Analyse |
 | Lizenzaktivierung/-aktualisierung/-entfernung | Lizenzdienst des Herstellers | Administrator-Klick in den Lizenz-Einstellungen |
@@ -279,6 +279,7 @@ Nicht übersetzt und absichtlich so: die **Prompt-Texte** an das Sprachmodell (i
 | Menügruppe „SEO STUDIO“ fehlt komplett | Keine gültige Lizenz | Lizenzzustand unter Einstellungen → Licence management prüfen (siehe [Lizenzzustände](#lizenzzustände)) |
 | Menügruppe erscheint nicht sofort nach Aktivierung | Backend-Cache | Cache leeren (siehe [Cache-Leerung](#deployment)) |
 | „KI: …“-Buttons tun nichts / Fehlermeldung | Kein API-Schlüssel gesetzt, Schlüssel ungültig, oder „keine externen Aufrufe“ aktiv | Einstellungen → KI prüfen, „Verbindung testen“ nutzen |
+| „Verbindung testen“ schlägt nach einem Anbieterwechsel fehl (z. B. 400/401/404) | Im Feld „Modell“ steht noch ein Modell des vorherigen Anbieters, oder der gespeicherte Schlüssel gehört zum vorherigen Anbieter | Feld „Modell“ leeren oder ein passendes Modell eintragen (z. B. `mistral-small-latest` für Mistral AI) und den Schlüssel des neuen Anbieters speichern |
 | KI-Generierung bricht mit Budget-Fehler ab | Monatliches Token-Budget erreicht | Budget erhöhen oder bis zum nächsten Monat warten; bereits erzeugte Entwürfe bleiben erhalten |
 | KI liefert Texte in der falschen Sprache | Root-Seite hat falsche Sprache hinterlegt | Root-Sprache korrigieren oder „Verhalten → Sprach-Override“ setzen |
 | Neu erzeugte Datenbankfelder fehlen (z. B. Fokus-Keyword) | Datenbank-Migration nach Aktivierung nicht erneut ausgeführt | „Datenbank aktualisieren“ erneut ausführen |

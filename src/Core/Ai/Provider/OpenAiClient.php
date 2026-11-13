@@ -25,8 +25,12 @@ use VTinnovations\SeoStudio\Core\Config\Translations;
  * OpenAI chat-completions client. Endpoint: POST {base}/chat/completions.
  *
  * Key comes from SecretStore (never cleartext config). The egress switch is
- * checked before any network work. The configurable base URL also powers the
- * "compatible" provider via the subclass.
+ * checked before any network work. The endpoint is fixed; only the
+ * "compatible" subclass reads the admin-configured base URL (see baseUrl()),
+ * so a leftover base URL can never redirect another provider's key.
+ *
+ * Subclasses for other chat-completions APIs (compatible, Mistral) override
+ * the protected hooks below rather than duplicating the request flow.
  */
 class OpenAiClient extends AbstractHttpClient
 {
@@ -56,7 +60,7 @@ class OpenAiClient extends AbstractHttpClient
     {
         $this->assertEgressAllowed();
         $apiKey = $this->requireApiKey();
-        $endpoint = $this->resolveBaseUrl(static::DEFAULT_BASE) . '/chat/completions';
+        $endpoint = $this->baseUrl() . '/chat/completions';
 
         $start = microtime(true);
 
@@ -75,7 +79,7 @@ class OpenAiClient extends AbstractHttpClient
             $body = $response->getContent(false);
         } catch (TransportException $e) {
             throw new AiException(
-                Translations::text('error.aiNetworkError', 'OpenAI', $e->getMessage()),
+                Translations::text('error.aiNetworkError', $this->providerLabel(), $e->getMessage()),
                 AiExceptionKind::Transport,
                 previous: $e,
             );
@@ -91,9 +95,28 @@ class OpenAiClient extends AbstractHttpClient
     }
 
     /**
+     * Human-readable provider name used in error messages.
+     */
+    protected function providerLabel(): string
+    {
+        return 'OpenAI';
+    }
+
+    /**
+     * The API base (no trailing slash). Fixed for hosted providers; the
+     * "compatible" subclass overrides this to honour the configured base URL.
+     *
+     * @throws AiException
+     */
+    protected function baseUrl(): string
+    {
+        return static::DEFAULT_BASE;
+    }
+
+    /**
      * @return array<string, mixed>
      */
-    private function buildPayload(PromptBundle $bundle): array
+    protected function buildPayload(PromptBundle $bundle): array
     {
         // Vision: when images are present the user message becomes a content
         // array (text + image_url data URIs). Text-only calls stay a plain string.
@@ -131,21 +154,33 @@ class OpenAiClient extends AbstractHttpClient
         return $payload;
     }
 
-    private function parseSuccess(string $body, PromptBundle $bundle, int $durationMs): AiResponse
+    /**
+     * The assistant text of the first choice, or null when there is none.
+     *
+     * @param array<mixed> $decoded
+     */
+    protected function extractContent(array $decoded): ?string
+    {
+        $content = $decoded['choices'][0]['message']['content'] ?? null;
+
+        return \is_string($content) && $content !== '' ? $content : null;
+    }
+
+    protected function parseSuccess(string $body, PromptBundle $bundle, int $durationMs): AiResponse
     {
         $decoded = json_decode($body, true);
         if (!\is_array($decoded)) {
-            throw new AiException(Translations::text('error.providerNonJson', 'OpenAI'), AiExceptionKind::InvalidResponse);
+            throw new AiException(Translations::text('error.providerNonJson', $this->providerLabel()), AiExceptionKind::InvalidResponse);
         }
 
-        $content = $decoded['choices'][0]['message']['content'] ?? null;
-        if (!\is_string($content) || $content === '') {
+        $content = $this->extractContent($decoded);
+        if ($content === null) {
             $finishReason = (string) ($decoded['choices'][0]['finish_reason'] ?? 'unknown');
             $kind = $finishReason === 'content_filter'
                 ? AiExceptionKind::PromptFiltered
                 : AiExceptionKind::InvalidResponse;
 
-            throw new AiException(Translations::text('error.aiNoContent', 'OpenAI', 'finish_reason', $finishReason), $kind);
+            throw new AiException(Translations::text('error.aiNoContent', $this->providerLabel(), 'finish_reason', $finishReason), $kind);
         }
 
         return new AiResponse(
@@ -159,11 +194,30 @@ class OpenAiClient extends AbstractHttpClient
         );
     }
 
-    private function throwForErrorStatus(int $statusCode, string $body, ResponseInterface $response): never
+    /**
+     * The provider's error message and machine code from an error body.
+     *
+     * @return array{0: string, 1: string} [message, code]; empty strings when absent
+     */
+    protected function extractError(string $body): array
     {
         $decoded = json_decode($body, true);
-        $errorMsg = \is_array($decoded) ? (string) ($decoded['error']['message'] ?? '') : '';
-        $errorCode = \is_array($decoded) ? (string) ($decoded['error']['code'] ?? '') : '';
+        if (!\is_array($decoded) || !\is_array($decoded['error'] ?? null)) {
+            return ['', ''];
+        }
+
+        $message = $decoded['error']['message'] ?? '';
+        $code = $decoded['error']['code'] ?? '';
+
+        return [
+            \is_string($message) ? $message : '',
+            \is_string($code) || \is_int($code) ? (string) $code : '',
+        ];
+    }
+
+    protected function throwForErrorStatus(int $statusCode, string $body, ResponseInterface $response): never
+    {
+        [$errorMsg, $errorCode] = $this->extractError($body);
 
         $retryAfter = $this->readRetryAfter($response);
 
@@ -181,7 +235,7 @@ class OpenAiClient extends AbstractHttpClient
 
         // Status + provider error type only — never the raw body (may echo input).
         throw new AiException(
-            sprintf('OpenAI %d%s', $statusCode, $errorMsg !== '' ? ': ' . $errorMsg : ''),
+            sprintf('%s %d%s', $this->providerLabel(), $statusCode, $errorMsg !== '' ? ': ' . $errorMsg : ''),
             $kind,
             retryAfterSeconds: $retryAfter,
             providerErrorCode: $errorCode !== '' ? $errorCode : null,

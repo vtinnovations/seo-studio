@@ -100,7 +100,7 @@ final class SettingsModule
 
         // ── Save ────────────────────────────────────────────────────────
         $provider = (string) $request->request->get('aiProvider', 'anthropic');
-        if (!\in_array($provider, ['anthropic', 'openai', 'compatible'], true)) {
+        if (!\in_array($provider, ['anthropic', 'openai', 'mistral', 'compatible'], true)) {
             $provider = 'anthropic';
         }
 
@@ -230,10 +230,11 @@ final class SettingsModule
             . '<select name="aiProvider" id="ctrl_aiProvider" class="tl_select">'
             . '<option value="anthropic"' . $selected($provider, 'anthropic') . '>Anthropic (Claude)</option>'
             . '<option value="openai"' . $selected($provider, 'openai') . '>OpenAI</option>'
+            . '<option value="mistral"' . $selected($provider, 'mistral') . '>Mistral AI</option>'
             . '<option value="compatible"' . $selected($provider, 'compatible') . '>' . $e($this->trans('aiProviderCompatible')) . '</option>'
             . '</select></div>'
             . '<div class="widget w50"><h3><label for="ctrl_aiModel">' . $t('aiModel', 'Modell (leer = Standard)') . '</label></h3>'
-            . '<input type="text" name="aiModel" id="ctrl_aiModel" class="tl_text" value="' . $e($config->get('aiModel', '')) . '" placeholder="claude-haiku-4-5 / gpt-4o-mini"></div>'
+            . '<input type="text" name="aiModel" id="ctrl_aiModel" class="tl_text" value="' . $e($config->get('aiModel', '')) . '" placeholder="claude-haiku-4-5 / gpt-4o-mini / mistral-small-latest"></div>'
             . '<div class="widget w50"><h3><label for="ctrl_aiApiKey">' . $t('aiApiKey', 'API-Schlüssel') . '</label></h3>'
             . '<input type="password" name="aiApiKey" id="ctrl_aiApiKey" class="tl_text" value="" autocomplete="new-password" placeholder="'
             . ($keySet ? $t('keySet', 'gespeichert — leer lassen zum Behalten, "!delete" zum Löschen') : $t('keyEmpty', 'noch kein Schlüssel gespeichert')) . '">'

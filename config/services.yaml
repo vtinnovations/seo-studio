@@ -119,6 +119,10 @@ services:
         arguments:
             $httpClient: '@http_client'
 
+    VTinnovations\SeoStudio\Core\Ai\Provider\MistralClient:
+        arguments:
+            $httpClient: '@http_client'
+
     VTinnovations\SeoStudio\Core\Ai\AiClientFactory:
         arguments:
             $clients: !tagged_iterator seo_studio.ai_client

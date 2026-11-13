@@ -155,8 +155,8 @@ The licence key **never** appears in full in the user interface, in ordinary log
 
 **Settings → AI settings**:
 
-- **Provider:** Anthropic (Claude), OpenAI, or OpenAI-compatible (custom base URL, e.g. for self-hosted or alternative models with an OpenAI-compatible API).
-- Enter the **API key** – stored **encrypted** (`defuse/php-encryption`, with the encryption key kept separate from the encrypted value, both outside the public web root) and **never shown in plain text**; leaving the field empty on save keeps the existing key.
+- **Provider:** Anthropic (Claude), OpenAI, Mistral AI (EU-hosted; default model `mistral-small-latest`, which also handles the image-based alt-text check), or OpenAI-compatible (custom base URL, e.g. for self-hosted or alternative models with an OpenAI-compatible API). The base URL is used only by the OpenAI-compatible provider; the other providers always connect to their own official endpoint.
+- Enter the **API key** – stored **encrypted** (`defuse/php-encryption`, with the encryption key kept separate from the encrypted value, both outside the public web root) and **never shown in plain text**; leaving the field empty on save keeps the existing key. Exactly **one** key is stored: when switching provider, enter the new provider's key and clear any model of the previous provider from the "Model" field (empty = the new provider's default model).
 - Optional: override the model (a default is set per provider), a monthly **token budget** (hard stop — at 100% every further AI request is refused, at 80% a warning appears on the settings page), and a "no external calls" switch to disable all AI network access entirely.
 - **"Test connection"** performs a single, minimal request to the configured provider and reports success/failure including response time — this check does not count against the token budget.
 
@@ -225,7 +225,7 @@ This bundle stores its own runtime data in a subdirectory of Contao's `var/` dir
 
 | Purpose | Destination | Triggered by |
 |---|---|---|
-| AI generation (meta, text, FAQ, glossary, alt text, focus keyword) | the configured AI provider (Anthropic, OpenAI, or OpenAI-compatible) | clicking an "AI: …" action, or the optional meta cron |
+| AI generation (meta, text, FAQ, glossary, alt text, focus keyword) | the configured AI provider (Anthropic, OpenAI, Mistral AI, or OpenAI-compatible) | clicking an "AI: …" action, or the optional meta cron |
 | Connection test | the configured AI provider | clicking "Test connection" |
 | robots.txt check | the site's own website (not a third party) | clicking "AI crawler audit" in Analysis |
 | Licence activation/refresh/removal | the vendor's licensing service | an administrator click in the licence settings |
@@ -279,6 +279,7 @@ Deliberately not translated: the **prompt text** sent to the language model (its
 | "SEO STUDIO" menu group is missing entirely | No valid licence | Check the licence state under Settings → Licence management (see [Licence states](#licence-states)) |
 | Menu group doesn't appear immediately after activation | Backend cache | Clear the cache (see [Cache clearing](#deployment)) |
 | "AI: …" buttons do nothing / show an error | No API key set, an invalid key, or "no external calls" enabled | Check Settings → AI, use "Test connection" |
+| "Test connection" fails after switching provider (e.g. 400/401/404) | The "Model" field still holds a model of the previous provider, or the stored key belongs to the previous provider | Clear the "Model" field or enter a matching model (e.g. `mistral-small-latest` for Mistral AI) and save the new provider's key |
 | AI generation stops with a budget error | Monthly token budget reached | Increase the budget or wait until next month; drafts already generated are kept |
 | AI produces text in the wrong language | The root page has the wrong language configured | Correct the root language, or set a "Behaviour → Language override" |
 | Newly expected database fields are missing (e.g. focus keyword) | Database migration wasn't re-run after activation | Run "Update database" again |

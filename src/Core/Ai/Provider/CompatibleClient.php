@@ -30,6 +30,19 @@ final class CompatibleClient extends OpenAiClient
         return 'gpt-3.5-turbo';
     }
 
+    protected function providerLabel(): string
+    {
+        return 'OpenAI-compatible';
+    }
+
+    /**
+     * The only provider that honours the admin-configured base URL.
+     */
+    protected function baseUrl(): string
+    {
+        return $this->resolveBaseUrl(static::DEFAULT_BASE);
+    }
+
     public function supportsModel(string $model): bool
     {
         // Compatible endpoints expose arbitrary model ids; don't gatekeep.

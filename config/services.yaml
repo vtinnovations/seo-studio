@@ -39,6 +39,7 @@ services:
             - '../src/Core/Config/EntitlementState.php'         # value object
             - '../src/Core/Config/ProvisioningRecord.php'       # value object
             - '../src/Core/Config/PackagePolicy.php'            # constants
+            - '../src/Core/Config/PackageLabel.php'             # static helper (display only)
             - '../src/Core/Config/InstanceStatePanel.php'       # Contao widget (new'ed by Contao)
             - '../src/Core/Content/HostName.php'                # static helper
             - '../src/Core/Content/Visibility.php'              # static helper

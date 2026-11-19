@@ -28,6 +28,8 @@ final class ExtractedContent
         public readonly array $headings,
         public readonly string $firstParagraph,
         public readonly int $wordCount,
+        /** tl_content id the first paragraph was taken from (0 = unknown). */
+        public readonly int $firstParagraphElementId = 0,
     ) {
     }
 

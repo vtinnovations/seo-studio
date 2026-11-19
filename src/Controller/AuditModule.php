@@ -104,7 +104,18 @@ final class AuditModule
             'time' => time(),
             'headings' => $headings->audit($pageId),
             'answerFirst' => null,
+            'elementId' => 0,
         ];
+
+        // Which content element holds the opening paragraph — for the
+        // "edit content" deep link next to the suggestion.
+        try {
+            /** @var \VTinnovations\SeoStudio\Core\Content\ContentExtractor $extractor */
+            $extractor = $container->get(\VTinnovations\SeoStudio\Core\Content\ContentExtractor::class);
+            $result['elementId'] = $extractor->forPage($pageId)->firstParagraphElementId;
+        } catch (\Throwable) {
+            // Link falls back to the page's article list.
+        }
 
         // Answer-first is the only LLM part — degrade gracefully without key.
         try {
@@ -437,12 +448,47 @@ final class AuditModule
                 foreach ((array) ($answerFirst['alternatives'] ?? []) as $alternative) {
                     $html .= '<p class="seo-studio-note">' . $e($this->transf('audit.answerFirstSuggestion', $alternative)) . '</p>';
                 }
+
+                $editUrl = $this->contentEditUrl($connection, $lastPageId, (int) ($last['elementId'] ?? 0));
+                if ($editUrl !== null) {
+                    $html .= '<div class="tl_submit_container" style="margin:8px 0">'
+                        . '<a href="' . $e($editUrl) . '" target="_blank" rel="noopener" class="tl_submit">'
+                        . $e($this->trans('audit.answerFirstEditButton')) . '</a></div>';
+                }
             } elseif (isset($last['answerFirstError'])) {
                 $html .= '<p class="tl_info">' . $e($this->transf('audit.answerFirstSkipped', $last['answerFirstError'])) . '</p>';
             }
         }
 
         return $html . '</fieldset></form>';
+    }
+
+    /**
+     * Backend URL where the opening paragraph is edited: the content element
+     * itself when known (and still present), otherwise the element list of the
+     * page's first article. Null when the page has no article at all.
+     */
+    private function contentEditUrl(\Doctrine\DBAL\Connection $connection, int $pageId, int $elementId): ?string
+    {
+        $router = System::getContainer()->get('router');
+        \assert($router instanceof \Symfony\Component\Routing\RouterInterface);
+
+        if ($elementId > 0) {
+            $exists = $connection->fetchOne(
+                "SELECT id FROM tl_content WHERE id = ? AND ptable = 'tl_article'",
+                [$elementId],
+            );
+            if ($exists !== false) {
+                return $router->generate('contao_backend', ['do' => 'article', 'table' => 'tl_content', 'act' => 'edit', 'id' => $elementId]);
+            }
+        }
+
+        $articleId = $connection->fetchOne('SELECT id FROM tl_article WHERE pid = ? ORDER BY sorting LIMIT 1', [$pageId]);
+        if ($articleId === false) {
+            return null;
+        }
+
+        return $router->generate('contao_backend', ['do' => 'article', 'table' => 'tl_content', 'id' => (int) $articleId]);
     }
 
     private function renderDuplicatesSection(callable $e, mixed $container): string

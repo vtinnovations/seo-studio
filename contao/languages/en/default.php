@@ -27,6 +27,9 @@ $GLOBALS['TL_LANG']['SEO_STUDIO']['licence']['factConfiguredDomains'] = 'Configu
 $GLOBALS['TL_LANG']['SEO_STUDIO']['licence']['factKey'] = 'Key';
 $GLOBALS['TL_LANG']['SEO_STUDIO']['licence']['factLastVerified'] = 'Last verified';
 $GLOBALS['TL_LANG']['SEO_STUDIO']['licence']['factPackage'] = 'Package';
+$GLOBALS['TL_LANG']['SEO_STUDIO']['licence']['packageDemo'] = 'Demo';
+$GLOBALS['TL_LANG']['SEO_STUDIO']['licence']['packageFree'] = 'Free';
+$GLOBALS['TL_LANG']['SEO_STUDIO']['licence']['packagePro'] = 'Pro';
 $GLOBALS['TL_LANG']['SEO_STUDIO']['licence']['factProduct'] = 'Product';
 $GLOBALS['TL_LANG']['SEO_STUDIO']['licence']['factStored'] = 'Licence stored';
 $GLOBALS['TL_LANG']['SEO_STUDIO']['licence']['factValidFrom'] = 'Valid from';
@@ -277,6 +280,7 @@ $GLOBALS['TL_LANG']['SEO_STUDIO']['audit']['noIntroParagraph'] = 'No opening par
 $GLOBALS['TL_LANG']['SEO_STUDIO']['audit']['answerFirstHeading'] = 'Answer-first opening: ';
 $GLOBALS['TL_LANG']['SEO_STUDIO']['audit']['answerFirstSkipped'] = 'Answer-first check skipped: %s';
 $GLOBALS['TL_LANG']['SEO_STUDIO']['audit']['answerFirstSuggestion'] = 'Suggestion: %s';
+$GLOBALS['TL_LANG']['SEO_STUDIO']['audit']['answerFirstEditButton'] = 'Edit opening paragraph';
 $GLOBALS['TL_LANG']['SEO_STUDIO']['audit']['badgeAllowed'] = 'allowed';
 $GLOBALS['TL_LANG']['SEO_STUDIO']['audit']['badgeBlocked'] = 'blocked';
 $GLOBALS['TL_LANG']['SEO_STUDIO']['audit']['badgeImplicit'] = ' (implicit)';
@@ -456,6 +460,8 @@ $GLOBALS['TL_LANG']['SEO_STUDIO']['features']['optimize'] = 'Text optimization (
 $GLOBALS['TL_LANG']['SEO_STUDIO']['features']['pageScore'] = 'Per-page SEO score (focus keyword, checklist, traffic light in page list)';
 $GLOBALS['TL_LANG']['SEO_STUDIO']['features']['schema'] = 'Structured data (JSON-LD: Organization, Breadcrumb, Article)';
 $GLOBALS['TL_LANG']['SEO_STUDIO']['features']['social'] = 'Social media preview (Open Graph + Twitter/X cards, image + live preview)';
+$GLOBALS['TL_LANG']['SEO_STUDIO']['features']['wordCount'] = 'Live word count under every rich-text editor (TinyMCE)';
+$GLOBALS['TL_LANG']['SEO_STUDIO']['wordCount']['label'] = '%words% words · %chars% characters';
 
 // ── Inline field help (settings) ────────────────────────────────────────
 $GLOBALS['TL_LANG']['SEO_STUDIO']['help']['llmsTxt'] = 'Something other than Schema.org: <code>llms.txt</code> is a file AI systems fetch to learn in two sentences what this website is about — like a robots.txt, but for content instead of access. One sentence is enough, and the AI writes it from your real pages at the push of a button.';

@@ -144,7 +144,11 @@ final class InstanceStatePanel extends Widget
         }
 
         if ($state->package !== '') {
-            $facts[] = Translations::text('licence.factPackage') . ': ' . strtoupper($state->package);
+            // Display only: Free / Pro / Demo. The demo flag is read from the
+            // vendor-signed record when there is one; without it (record not
+            // authenticated) the package string alone decides.
+            $facts[] = Translations::text('licence.factPackage') . ': '
+                . PackageLabel::text($state->package, $record?->isDemo() ?? false);
         }
 
         if ($record !== null) {

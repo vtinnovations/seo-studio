@@ -217,6 +217,21 @@ final class ProvisioningRecord
         return (bool) $this->document['license_lifetime'];
     }
 
+    /**
+     * DISPLAY ONLY: whether the vendor marked this licence as a demo (a
+     * time-limited Pro). Never consult it for entitlement — a demo carries
+     * license_package "pro" and is granted exactly like Pro.
+     *
+     * The field is optional: written only on demos and then always true,
+     * never sent as false. Missing, null or any non-boolean means "not a demo".
+     * It is deliberately not part of the shape check, so a payload is never
+     * rejected for carrying it or for lacking it.
+     */
+    public function isDemo(): bool
+    {
+        return ($this->document['license_is_demo'] ?? null) === true;
+    }
+
     public function verifiedAt(): int
     {
         return (int) $this->document['license_verified_at'];

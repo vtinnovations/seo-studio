@@ -68,6 +68,8 @@ final class ContentExtractor
 
         $headings = [];
         $textBlocks = [];
+        /** @var list<int> $blockOwners tl_content id per entry of $textBlocks */
+        $blockOwners = [];
 
         if ($articleIds !== []) {
             // Page builders (e.g. Draggo) keep their prose in extra columns —
@@ -95,10 +97,17 @@ final class ContentExtractor
                 $this->extractHeadline($element, $headings, 'sectionHeadline');
                 $this->extractText($element, $textBlocks);
                 $this->extractCustomProps($element, $textBlocks);
+
+                // Remember which element each new text block came from, so the
+                // UI can deep-link to the element holding the first paragraph.
+                while (\count($blockOwners) < \count($textBlocks)) {
+                    $blockOwners[] = (int) $element['id'];
+                }
             }
         }
 
         $plaintext = trim(implode("\n\n", array_filter($textBlocks)));
+        [$firstParagraph, $firstBlockIndex] = $this->firstParagraph($textBlocks);
 
         return new ExtractedContent(
             pageId: $pageId,
@@ -106,8 +115,9 @@ final class ContentExtractor
             language: $this->resolveLanguage($pageId, (string) ($page['language'] ?? '')),
             plaintext: $plaintext,
             headings: $headings,
-            firstParagraph: $this->firstParagraph($textBlocks),
+            firstParagraph: $firstParagraph,
             wordCount: $plaintext === '' ? 0 : \count(preg_split('/\s+/u', $plaintext, -1, PREG_SPLIT_NO_EMPTY) ?: []),
+            firstParagraphElementId: $firstBlockIndex !== null ? ($blockOwners[$firstBlockIndex] ?? 0) : 0,
         );
     }
 
@@ -297,20 +307,22 @@ final class ContentExtractor
 
     /**
      * @param list<string> $textBlocks
+     *
+     * @return array{0: string, 1: int|null} paragraph text and index of its block
      */
-    private function firstParagraph(array $textBlocks): string
+    private function firstParagraph(array $textBlocks): array
     {
-        foreach ($textBlocks as $block) {
+        foreach ($textBlocks as $index => $block) {
             foreach (explode("\n", $block) as $line) {
                 $line = trim($line);
                 // Skip ultra-short lines (labels, buttons) — a real paragraph.
                 if (mb_strlen($line) >= 40) {
-                    return $line;
+                    return [$line, $index];
                 }
             }
         }
 
-        return '';
+        return ['', null];
     }
 
     /**

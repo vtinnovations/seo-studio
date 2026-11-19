@@ -797,3 +797,22 @@ html[data-color-scheme="dark"] .seo-studio-pf-link { color: #69db7c; }
     margin-top: 8px !important;
     color: var(--seo-studio-muted, #8a8a8a);
 }
+
+/* Live word count under TinyMCE editors (wordcount.js).
+   Contao's theme sets `.widget>div{font-size:0}` (and only re-sizes the
+   div's CHILDREN), so the counter carries its text in a child <span> and the
+   selector below out-ranks that rule. */
+.widget > div.seo-studio-wordcount,
+.seo-studio-wordcount {
+    margin-top: 4px;
+    font-size: .75rem;
+    line-height: 1.4;
+    text-align: right;
+    color: var(--seo-studio-muted, #888888);
+    font-variant-numeric: tabular-nums;
+}
+
+.widget > div.seo-studio-wordcount > span,
+.seo-studio-wordcount > span {
+    font-size: .75rem;
+}

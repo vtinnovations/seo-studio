@@ -146,6 +146,7 @@ final class ConfigProvider
             'featureGlossary' => true,
             'featurePageScore' => true,
             'featureSocial' => true,
+            'featureWordCount' => true,
 
             // Schema.org data
             'schemaOrgName' => '',
